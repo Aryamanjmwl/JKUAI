@@ -25,8 +25,8 @@ Permission filters are applied independently to both retrieval paths before fusi
 Prerequisites: Python 3.11 or 3.12, Git, Docker Desktop, and VS Code.
 
 ```powershell
-git clone <your-repository-url>
-cd jku-knowledge-search
+git clone https://github.com/Aryamanjmwl/JKUAI.git
+cd JKUAI
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
@@ -95,5 +95,6 @@ It reports Recall@5, MRR, mean latency, and p95 latency. Answer-correctness judg
 - OpenAI Responses API answer generation
 - Inline citation contract and exact documents used
 - Evaluation runner and unit tests
+- Responsive React and TypeScript search interface
 
-Next milestones: web crawler for public JKU pages, React UI, admin document dashboard, automated citation validation, LLM/human correctness scoring, and a 50-question benchmark.
+Next milestones: web crawler for public JKU pages, admin document dashboard, automated citation validation, LLM/human correctness scoring, and a 50-question benchmark.
