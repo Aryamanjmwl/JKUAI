@@ -39,7 +39,7 @@ cpu = [
 ]
 
 [tool.pytest.ini_options]
-pythonpath = ["backend"]
+pythonpath = ["backend", "."]
 testpaths = ["tests"]
 
 [tool.ruff]
