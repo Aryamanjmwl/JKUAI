@@ -14,16 +14,20 @@ export async function searchKnowledge(
   groups: string[],
   openaiApiKey: string,
 ): Promise<SearchResult> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "X-OpenAI-API-Key": openaiApiKey,
+  };
+  if (groups.length > 0) {
+    headers["X-User-Id"] = "local-demo-user";
+    headers["X-User-Groups"] = groups.join(",");
+  }
+
   let response: Response;
   try {
     response = await fetch(`${API_URL}/search`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-OpenAI-API-Key": openaiApiKey,
-        "X-User-Id": "local-demo-user",
-        "X-User-Groups": groups.join(","),
-      },
+      headers,
       body: JSON.stringify({ query }),
     });
   } catch {

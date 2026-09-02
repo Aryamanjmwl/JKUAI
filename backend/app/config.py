@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     vector_dimension: int = 384
     retrieve_k: int = 20
     rerank_k: int = 5
+    enable_demo_roles: bool = False
     cors_origins: list[str] = ["http://localhost:5173"]
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

@@ -63,7 +63,25 @@ curl.exe -X POST http://localhost:8000/documents `
   -F "visibility=public"
 ```
 
-## Search with permissions
+## Permission model
+
+The default application is public-only. User-supplied identity and group headers are ignored, so a browser user cannot grant themselves access to restricted documents.
+
+For local permission demonstrations, explicitly enable developer demo mode in both terminals:
+
+```powershell
+# Backend terminal
+$env:ENABLE_DEMO_ROLES="true"
+uvicorn app.main:app --app-dir backend --reload
+
+# Frontend terminal
+$env:VITE_ENABLE_DEMO_ROLES="true"
+npm run dev
+```
+
+The frontend then displays a clearly labelled simulated-role control. This mode is for development only and must remain disabled in public deployments. Production access control requires authenticated identities with roles assigned server-side.
+
+Developer-mode API example:
 
 ```powershell
 curl.exe -X POST http://localhost:8000/search `

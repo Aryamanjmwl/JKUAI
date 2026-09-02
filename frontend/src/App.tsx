@@ -8,6 +8,7 @@ const EXAMPLE_QUESTIONS = [
   "How many ECTS credits do I need to graduate?",
   "What happens if I miss an exam?",
 ];
+const DEMO_ROLES_ENABLED = import.meta.env.VITE_ENABLE_DEMO_ROLES === "true";
 
 function AnswerText({ answer, sources }: { answer: string; sources: Source[] }) {
   const sourceIds = new Set(sources.map((source) => source.citation_id));
@@ -31,7 +32,7 @@ export default function App() {
   const [draftApiKey, setDraftApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [query, setQuery] = useState("");
-  const [group, setGroup] = useState("students");
+  const [group, setGroup] = useState(DEMO_ROLES_ENABLED ? "students" : "");
   const [result, setResult] = useState<SearchResult | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -105,19 +106,26 @@ export default function App() {
               <button onClick={disconnectOpenAI} type="button">Disconnect</button>
             </div>
           )}
-          <div className="role-picker">
-            <label htmlFor="role">Viewing as</label>
-            <select id="role" value={group} onChange={(event) => setGroup(event.target.value)}>
-              <option value="students">Student</option>
-              <option value="">Public visitor</option>
-              <option value="staff">Staff member</option>
-              <option value="admissions">Admissions team</option>
-            </select>
-          </div>
         </div>
       </header>
 
       <main>
+        {DEMO_ROLES_ENABLED && (
+          <aside className="demo-toolbar" aria-label="Developer demo access controls">
+            <div>
+              <strong>Developer demo mode</strong>
+              <span>Roles are simulated for testing only. This is not a real sign-in.</span>
+            </div>
+            <label htmlFor="demo-role">Simulated role</label>
+            <select id="demo-role" value={group} onChange={(event) => setGroup(event.target.value)}>
+              <option value="">Public visitor</option>
+              <option value="students">Student</option>
+              <option value="staff">Staff member</option>
+              <option value="admissions">Admissions team</option>
+            </select>
+          </aside>
+        )}
+
         <section className="search-section" aria-labelledby="page-title">
           <p className="section-label">JKU STUDY INFORMATION</p>
           <h1 id="page-title">What would you like to know?</h1>

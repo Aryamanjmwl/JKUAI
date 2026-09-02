@@ -29,12 +29,15 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="JKU Knowledge Search", version="0.1.0", lifespan=lifespan)
+allowed_headers = ["Content-Type", "X-OpenAI-API-Key"]
+if get_settings().enable_demo_roles:
+    allowed_headers.extend(["X-User-Id", "X-User-Groups"])
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().cors_origins,
     allow_credentials=False,
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "X-OpenAI-API-Key", "X-User-Id", "X-User-Groups"],
+    allow_headers=allowed_headers,
 )
 
 

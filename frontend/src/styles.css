@@ -66,18 +66,24 @@ button:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visi
 .key-status > span:first-child { width: 8px; height: 8px; border-radius: 50%; background: #28a168; box-shadow: 0 0 0 3px #e0f3e9; }
 .key-status button { padding: 6px 8px; border: 0; color: var(--muted); background: transparent; font-size: 12px; text-decoration: underline; text-underline-offset: 2px; }
 .key-status button:hover { color: #7e2f22; }
-.role-picker { display: flex; align-items: center; gap: 9px; color: var(--muted); }
-.role-picker label { font-size: 13px; font-weight: 650; }
-.role-picker select {
-  min-height: 38px;
-  padding: 0 34px 0 12px;
-  border: 1px solid #cbd5ce;
-  border-radius: 9px;
-  color: var(--ink);
-  background: var(--surface);
-}
 
 main { width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 64px 0 88px; }
+.demo-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: -38px 0 38px;
+  padding: 12px 14px;
+  border: 1px solid #e3c877;
+  border-radius: 10px;
+  color: #5e4b12;
+  background: #fff9e8;
+}
+.demo-toolbar > div { display: grid; flex: 1; gap: 2px; }
+.demo-toolbar strong { font-size: 13px; }
+.demo-toolbar span { color: #77652e; font-size: 12px; }
+.demo-toolbar label { font-size: 12px; font-weight: 700; }
+.demo-toolbar select { min-height: 36px; padding: 0 32px 0 10px; border: 1px solid #d5bd73; border-radius: 8px; color: #4e3e0e; background: white; }
 .search-section { max-width: 860px; margin: 0 auto; text-align: center; }
 .section-label { margin: 0 0 10px; color: var(--green-700); font-size: 12px; font-weight: 800; letter-spacing: .11em; }
 h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(38px, 5vw, 58px); line-height: 1.08; letter-spacing: -.04em; font-weight: 500; }
@@ -288,11 +294,12 @@ footer p { margin: 0; font-size: 12px; }
 
 @media (max-width: 600px) {
   .topbar { align-items: flex-start; gap: 16px; padding: 13px 16px; }
-  .brand-copy small, .role-picker label { display: none; }
+  .brand-copy small { display: none; }
   .brand-copy strong { font-size: 14px; }
   .topbar-actions { flex-direction: column-reverse; align-items: flex-end; gap: 4px; }
   .key-status button { padding-block: 3px; }
-  .role-picker select { max-width: 132px; padding-left: 9px; font-size: 13px; }
+  .demo-toolbar { align-items: stretch; flex-direction: column; margin-top: -22px; }
+  .demo-toolbar select { width: 100%; }
   main { padding-top: 38px; padding-bottom: 64px; }
   h1 { font-size: 38px; }
   .intro { font-size: 16px; }
