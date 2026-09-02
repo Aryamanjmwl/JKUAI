@@ -205,6 +205,7 @@ docs/adr/             Architecture decision records
 
 ## Engineering decisions
 
+- [Security and trust boundaries](docs/security.md)
 - [ADR 0001: Separate lexical and vector indexes](docs/adr/0001-hybrid-retrieval.md)
 - [ADR 0002: Filter permissions during retrieval](docs/adr/0002-permission-filtering.md)
 
