@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .auth import UserContext
 from .config import get_settings
 from .database import get_session
-from .schemas import IngestResponse, SearchRequest, SearchResponse, Source
+from .schemas import IngestResponse, RetrievalResponse, SearchRequest, SearchResponse, Source
 from .security import get_user_context
 from .services.generation import (
     InvalidOpenAICredentialsError,
@@ -98,7 +98,33 @@ async def search(
         raise HTTPException(429, "The OpenAI account has no available quota") from exc
     except OpenAIServiceError as exc:
         raise HTTPException(502, "OpenAI is temporarily unavailable") from exc
-    sources = [
+    sources = _build_sources(hits)
+    return SearchResponse(
+        answer=answer,
+        sources=sources,
+        exact_documents_used=_document_names(sources),
+        latency_ms=round((perf_counter() - start) * 1000, 2),
+    )
+
+
+@app.post("/search/retrieval", response_model=RetrievalResponse)
+async def retrieve(
+    request: SearchRequest,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    user: Annotated[UserContext, Depends(get_user_context)],
+) -> RetrievalResponse:
+    start = perf_counter()
+    hits = await hybrid_search(session, request.query, user)
+    sources = _build_sources(hits)
+    return RetrievalResponse(
+        sources=sources,
+        exact_documents_used=_document_names(sources),
+        latency_ms=round((perf_counter() - start) * 1000, 2),
+    )
+
+
+def _build_sources(hits: list[dict]) -> list[Source]:
+    return [
         Source(
             citation_id=f"S{i}",
             document_id=hit["document_id"],
@@ -112,10 +138,7 @@ async def search(
         )
         for i, hit in enumerate(hits, start=1)
     ]
-    documents = list(dict.fromkeys(source.file_name for source in sources))
-    return SearchResponse(
-        answer=answer,
-        sources=sources,
-        exact_documents_used=documents,
-        latency_ms=round((perf_counter() - start) * 1000, 2),
-    )
+
+
+def _document_names(sources: list[Source]) -> list[str]:
+    return list(dict.fromkeys(source.file_name for source in sources))

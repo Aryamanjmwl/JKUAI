@@ -19,11 +19,14 @@ class Source(BaseModel):
     score: float
 
 
-class SearchResponse(BaseModel):
-    answer: str
+class RetrievalResponse(BaseModel):
     sources: list[Source]
     exact_documents_used: list[str]
     latency_ms: float
+
+
+class SearchResponse(RetrievalResponse):
+    answer: str
 
 
 class IngestResponse(BaseModel):

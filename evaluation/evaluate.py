@@ -18,7 +18,7 @@ def main() -> None:
         for row in rows:
             started = time.perf_counter()
             response = client.post(
-                f"{args.url}/search",
+                f"{args.url}/search/retrieval",
                 json={"query": row["question"]},
                 headers={"X-User-Groups": ",".join(row.get("groups", []))},
             )
