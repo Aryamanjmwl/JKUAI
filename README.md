@@ -37,7 +37,7 @@ alembic upgrade head
 uvicorn app.main:app --app-dir backend --reload
 ```
 
-Add your API key to `.env`; never commit that file. The official Python SDK reads API credentials from the environment. Open <http://localhost:8000/docs> to use the interactive API.
+Open <http://localhost:8000/docs> to use the interactive API. OpenAI credentials are supplied per search request and are never stored by the application.
 
 In a second VS Code terminal, start the web client:
 
@@ -68,12 +68,15 @@ curl.exe -X POST http://localhost:8000/documents `
 ```powershell
 curl.exe -X POST http://localhost:8000/search `
   -H "Content-Type: application/json" `
+  -H "X-OpenAI-API-Key: YOUR_OPENAI_API_KEY" `
   -H "X-User-Id: anushka" `
   -H "X-User-Groups: students" `
   -d '{"query":"Which courses do I need before taking Advanced Machine Learning?"}'
 ```
 
 The response contains an answer with `[S1]` citations, source excerpts, page numbers, document links, exact document filenames, reranker scores, and end-to-end latency.
+
+The API key is request-scoped: it is passed directly to OpenAI for that request and is not written to PostgreSQL, browser storage, cookies, environment files, or application logs. Public deployments must use HTTPS so credentials are encrypted in transit. Each user is responsible for usage billed to their own OpenAI account. Keys can be created from the [OpenAI API key dashboard](https://platform.openai.com/api-keys).
 
 ## Evaluate retrieval
 

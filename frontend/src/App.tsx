@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from "react";
 
-import { searchKnowledge } from "./api";
+import { SearchError, searchKnowledge } from "./api";
 import type { SearchResult, Source } from "./types";
 
 const EXAMPLE_QUESTIONS = [
@@ -27,6 +27,9 @@ function AnswerText({ answer, sources }: { answer: string; sources: Source[] }) 
 }
 
 export default function App() {
+  const [apiKey, setApiKey] = useState("");
+  const [draftApiKey, setDraftApiKey] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState("students");
   const [result, setResult] = useState<SearchResult | null>(null);
@@ -35,15 +38,19 @@ export default function App() {
 
   async function runSearch(question: string) {
     const cleanQuestion = question.trim();
-    if (cleanQuestion.length < 3 || loading) return;
+    if (cleanQuestion.length < 3 || !apiKey || loading) return;
 
     setQuery(cleanQuestion);
     setLoading(true);
     setError("");
     setResult(null);
     try {
-      setResult(await searchKnowledge(cleanQuestion, group ? [group] : []));
+      setResult(await searchKnowledge(cleanQuestion, group ? [group] : [], apiKey));
     } catch (reason) {
+      if (reason instanceof SearchError && reason.status === 401) {
+        setApiKey("");
+        setDraftApiKey("");
+      }
       setError(
         reason instanceof Error
           ? reason.message
@@ -59,6 +66,24 @@ export default function App() {
     void runSearch(query);
   }
 
+  function connectOpenAI(event: FormEvent) {
+    event.preventDefault();
+    const cleanKey = draftApiKey.trim();
+    if (!cleanKey) return;
+
+    setApiKey(cleanKey);
+    setDraftApiKey("");
+    setShowApiKey(false);
+    setError("");
+  }
+
+  function disconnectOpenAI() {
+    setApiKey("");
+    setDraftApiKey("");
+    setResult(null);
+    setError("");
+  }
+
   const sourceCount = result?.sources.length ?? 0;
 
   return (
@@ -72,14 +97,23 @@ export default function App() {
           </span>
         </a>
 
-        <div className="role-picker">
-          <label htmlFor="role">Viewing as</label>
-          <select id="role" value={group} onChange={(event) => setGroup(event.target.value)}>
-            <option value="students">Student</option>
-            <option value="">Public visitor</option>
-            <option value="staff">Staff member</option>
-            <option value="admissions">Admissions team</option>
-          </select>
+        <div className="topbar-actions">
+          {apiKey && (
+            <div className="key-status" role="status">
+              <span aria-hidden="true" />
+              <span>OpenAI ready</span>
+              <button onClick={disconnectOpenAI} type="button">Disconnect</button>
+            </div>
+          )}
+          <div className="role-picker">
+            <label htmlFor="role">Viewing as</label>
+            <select id="role" value={group} onChange={(event) => setGroup(event.target.value)}>
+              <option value="students">Student</option>
+              <option value="">Public visitor</option>
+              <option value="staff">Staff member</option>
+              <option value="admissions">Admissions team</option>
+            </select>
+          </div>
         </div>
       </header>
 
@@ -92,7 +126,69 @@ export default function App() {
             Every answer shows the documents it came from.
           </p>
 
-          <form className="search-form" onSubmit={submit}>
+          {!apiKey && (
+            <section className="connection-card" aria-labelledby="connection-title">
+              <div className="connection-copy">
+                <span className="shield-icon" aria-hidden="true">✓</span>
+                <div>
+                  <p className="connection-step">ONE-TIME SETUP FOR THIS TAB</p>
+                  <h2 id="connection-title">Connect your OpenAI API key</h2>
+                  <p>
+                    JKUAI searches university documents locally. Your key is used only to turn
+                    those sources into a clear answer.
+                  </p>
+                </div>
+              </div>
+
+              <form className="key-form" onSubmit={connectOpenAI}>
+                <label htmlFor="openai-key">OpenAI API key</label>
+                <div className="key-input-row">
+                  <input
+                    id="openai-key"
+                    type={showApiKey ? "text" : "password"}
+                    value={draftApiKey}
+                    onChange={(event) => setDraftApiKey(event.target.value)}
+                    placeholder="Paste your key here"
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                  />
+                  <button
+                    className="show-key"
+                    onClick={() => setShowApiKey((visible) => !visible)}
+                    type="button"
+                    aria-label={showApiKey ? "Hide API key" : "Show API key"}
+                  >
+                    {showApiKey ? "Hide" : "Show"}
+                  </button>
+                  <button className="connect-button" disabled={!draftApiKey.trim()} type="submit">
+                    Use this key
+                  </button>
+                </div>
+              </form>
+
+              <div className="key-help">
+                <p><strong>Private for this session.</strong> The key is not saved and is cleared when you refresh or disconnect.</p>
+                <p><strong>Your account pays.</strong> API usage is billed by OpenAI to the account that owns the key.</p>
+              </div>
+
+              <div className="key-links">
+                <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer">
+                  Create an OpenAI API key <span aria-hidden="true">↗</span>
+                </a>
+                <details>
+                  <summary>How is my key handled?</summary>
+                  <p>
+                    It stays in this browser tab and is sent through the JKUAI server to OpenAI
+                    with each question. It is never added to browser storage, cookies, or the
+                    JKUAI database. Use only a trusted JKUAI website with HTTPS.
+                  </p>
+                </details>
+              </div>
+            </section>
+          )}
+
+          {apiKey && <form className="search-form" onSubmit={submit}>
             <label className="sr-only" htmlFor="question">Your question</label>
             <div className="question-box">
               <textarea
@@ -114,9 +210,9 @@ export default function App() {
               </button>
             </div>
             <p id="question-help" className="question-help">Press Enter to search · Shift + Enter for a new line</p>
-          </form>
+          </form>}
 
-          <div className="examples" aria-label="Example questions">
+          {apiKey && <div className="examples" aria-label="Example questions">
             <span>Try an example</span>
             <div className="example-list">
               {EXAMPLE_QUESTIONS.map((example) => (
@@ -125,7 +221,7 @@ export default function App() {
                 </button>
               ))}
             </div>
-          </div>
+          </div>}
         </section>
 
         {loading && (
@@ -144,11 +240,16 @@ export default function App() {
               <strong>We couldn’t complete that search.</strong>
               <p>{error}</p>
             </div>
-            <button onClick={() => void runSearch(query)} type="button">Try again</button>
+            <button
+              onClick={() => apiKey ? void runSearch(query) : setError("")}
+              type="button"
+            >
+              {apiKey ? "Try again" : "Enter another key"}
+            </button>
           </section>
         )}
 
-        {!loading && !error && !result && (
+        {apiKey && !loading && !error && !result && (
           <section className="how-it-works" aria-label="How search works">
             <div><span>1</span><p><strong>Ask naturally</strong>Use the same words you would use when asking a study advisor.</p></div>
             <div><span>2</span><p><strong>Read the answer</strong>JKUAI combines information found in relevant documents.</p></div>

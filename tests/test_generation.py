@@ -1,6 +1,7 @@
 from unittest.mock import Mock, patch
 
-from app.services.generation import _generate_answer_sync
+import pytest
+from app.services.generation import InvalidOpenAICredentialsError, _generate_answer_sync
 
 HITS = [
     {
@@ -17,10 +18,9 @@ def test_generation_does_not_require_a_key_when_retrieval_is_empty():
     assert answer == "I could not find an accessible source that answers this question."
 
 
-def test_generation_returns_sources_when_no_key_is_configured():
-    answer = _generate_answer_sync("What is required?", HITS, None)
-
-    assert answer == "Retrieval succeeded, but OPENAI_API_KEY is not configured. See the sources below."
+def test_generation_requires_a_request_scoped_key():
+    with pytest.raises(InvalidOpenAICredentialsError):
+        _generate_answer_sync("What is required?", HITS, None)
 
 
 def test_generation_passes_the_request_key_to_openai():

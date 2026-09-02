@@ -33,9 +33,9 @@ def _generate_answer_sync(query: str, hits: list[dict], api_key: str | None) -> 
     settings = get_settings()
     if not hits:
         return "I could not find an accessible source that answers this question."
-    effective_api_key = (api_key or settings.openai_api_key).strip()
+    effective_api_key = (api_key or "").strip()
     if not effective_api_key:
-        return "Retrieval succeeded, but OPENAI_API_KEY is not configured. See the sources below."
+        raise InvalidOpenAICredentialsError
     context = "\n\n".join(
         f"[S{i}] {hit['title']} (page {hit['page_number'] or 'unknown'})\n{hit['content']}"
         for i, hit in enumerate(hits, start=1)
