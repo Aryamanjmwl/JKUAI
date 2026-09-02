@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from time import perf_counter
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,7 +11,12 @@ from .config import get_settings
 from .database import get_session
 from .schemas import IngestResponse, SearchRequest, SearchResponse, Source
 from .security import get_user_context
-from .services.generation import generate_answer
+from .services.generation import (
+    InvalidOpenAICredentialsError,
+    OpenAIQuotaError,
+    OpenAIServiceError,
+    generate_answer,
+)
 from .services.ingestion import ingest_pdf
 from .services.opensearch import ensure_index_async
 from .services.search import hybrid_search
@@ -29,7 +34,7 @@ app.add_middleware(
     allow_origins=get_settings().cors_origins,
     allow_credentials=False,
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "X-User-Id", "X-User-Groups"],
+    allow_headers=["Content-Type", "X-OpenAI-API-Key", "X-User-Id", "X-User-Groups"],
 )
 
 
@@ -78,10 +83,18 @@ async def search(
     request: SearchRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
     user: Annotated[UserContext, Depends(get_user_context)],
+    openai_api_key: Annotated[str | None, Header(alias="X-OpenAI-API-Key")] = None,
 ) -> SearchResponse:
     start = perf_counter()
     hits = await hybrid_search(session, request.query, user)
-    answer = await generate_answer(request.query, hits)
+    try:
+        answer = await generate_answer(request.query, hits, openai_api_key)
+    except InvalidOpenAICredentialsError as exc:
+        raise HTTPException(401, "The OpenAI API key was not accepted") from exc
+    except OpenAIQuotaError as exc:
+        raise HTTPException(429, "The OpenAI account has no available quota") from exc
+    except OpenAIServiceError as exc:
+        raise HTTPException(502, "OpenAI is temporarily unavailable") from exc
     sources = [
         Source(
             citation_id=f"S{i}",
