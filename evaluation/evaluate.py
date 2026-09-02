@@ -6,6 +6,26 @@ import time
 import httpx
 
 
+def score_retrieval(
+    retrieved_document_ids: list[str],
+    relevant_document_ids: set[str],
+    *,
+    k: int = 5,
+) -> tuple[float, float]:
+    if not relevant_document_ids:
+        raise ValueError("relevant_document_ids must contain at least one document")
+
+    top_k = retrieved_document_ids[:k]
+    recall = len(relevant_document_ids.intersection(top_k)) / len(relevant_document_ids)
+    relevant_ranks = [
+        rank
+        for rank, document_id in enumerate(top_k, start=1)
+        if document_id in relevant_document_ids
+    ]
+    reciprocal_rank = 1 / min(relevant_ranks) if relevant_ranks else 0.0
+    return recall, reciprocal_rank
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("dataset")
@@ -26,10 +46,10 @@ def main() -> None:
             result = response.json()
             latencies.append((time.perf_counter() - started) * 1000)
             retrieved = [str(source["document_id"]) for source in result["sources"]]
-            relevant = set(row["relevant_document_ids"])
-            recalls.append(float(bool(relevant.intersection(retrieved[:5]))))
-            ranks = [i for i, doc_id in enumerate(retrieved, 1) if doc_id in relevant]
-            reciprocal_ranks.append(1 / min(ranks) if ranks else 0.0)
+            relevant = {str(document_id) for document_id in row["relevant_document_ids"]}
+            recall, reciprocal_rank = score_retrieval(retrieved, relevant)
+            recalls.append(recall)
+            reciprocal_ranks.append(reciprocal_rank)
     print(
         json.dumps(
             {
