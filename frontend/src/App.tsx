@@ -31,8 +31,10 @@ function AnswerText({ answer, sources }: { answer: string; sources: Source[] }) 
 export default function App() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [mode, setMode] = useState<"retrieval" | "answer">("retrieval");
+  const [editingKey, setEditingKey] = useState(false);
+  const [answerUnavailable, setAnswerUnavailable] = useState(false);
   const [apiKey, setApiKey] = useState("");
+  const mode = apiKey ? "answer" : "retrieval";
   const [draftApiKey, setDraftApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [query, setQuery] = useState("");
@@ -43,15 +45,21 @@ export default function App() {
 
   async function runSearch(question: string) {
     const cleanQuestion = question.trim();
-    if (cleanQuestion.length < 3 || (mode === "answer" && !apiKey) || loading) return;
+    if (cleanQuestion.length < 3 || loading) return;
 
     setQuery(cleanQuestion);
     setLoading(true);
+    setAnswerUnavailable(false);
     setError("");
     setResult(null);
     try {
       setResult(await searchKnowledge(cleanQuestion, group ? [group] : [], apiKey, mode));
     } catch (reason) {
+      setAnswerUnavailable(true);
+      // Keep accessible evidence visible even when the answer provider fails.
+      try {
+        setResult(await searchKnowledge(cleanQuestion, group ? [group] : [], "", "retrieval"));
+      } catch { /* Preserve the original failure rather than replacing it. */ }
       if (reason instanceof SearchError && reason.status === 401) {
         setApiKey("");
         setDraftApiKey("");
@@ -77,6 +85,9 @@ export default function App() {
     if (!cleanKey) return;
 
     setApiKey(cleanKey);
+    setEditingKey(false);
+    setResult(null);
+    setAnswerUnavailable(false);
     setDraftApiKey("");
     setShowApiKey(false);
     setError("");
@@ -84,6 +95,7 @@ export default function App() {
 
   function disconnectOpenAI() {
     setApiKey("");
+    setEditingKey(false);
     setDraftApiKey("");
     setResult(null);
     setError("");
@@ -109,7 +121,8 @@ export default function App() {
           {apiKey && (
             <div className="key-status" role="status">
               <span aria-hidden="true" />
-              <span>OpenAI ready</span>
+              <span>API key set</span>
+              <button disabled={loading} onClick={() => { setEditingKey(true); setDraftApiKey(""); setShowApiKey(false); }} type="button">Change API key</button>
               <button disabled={loading} onClick={disconnectOpenAI} type="button">Disconnect</button>
             </div>
           )}
@@ -124,7 +137,7 @@ export default function App() {
               <span>Roles are simulated for testing only. This is not a real sign-in.</span>
             </div>
             <label htmlFor="demo-role">Simulated role</label>
-            <select id="demo-role" value={group} disabled={loading || uploading} onChange={(event) => { setGroup(event.target.value); setResult(null); setError(""); }}>
+            <select id="demo-role" value={group} disabled={loading || uploading} onChange={(event) => { setGroup(event.target.value); setResult(null); setError(""); setAnswerUnavailable(false); }}>
               <option value="">Public visitor</option>
               <option value="students">Student</option>
               <option value="staff">Staff member</option>
@@ -145,14 +158,10 @@ export default function App() {
           <h1 id="page-title">What would you like to know?</h1>
           <p className="intro">
             Ask about courses, prerequisites, exams, deadlines, or university regulations.
-            Search source passages directly, or generate an answer with citations.
+            Get an answer grounded in your documents, with clickable source tags.
           </p>
 
-          <div className="search-modes" role="group" aria-label="Search mode">
-            <button type="button" disabled={loading} aria-pressed={mode === "retrieval"} onClick={() => { setMode("retrieval"); setResult(null); setError(""); }}>Search sources</button>
-            <button type="button" disabled={loading} aria-pressed={mode === "answer"} onClick={() => { setMode("answer"); setResult(null); setError(""); }}>Answer with citations</button>
-          </div>
-          {mode === "answer" && !apiKey && (
+          {(!apiKey || editingKey) && (
             <section className="connection-card" aria-labelledby="connection-title">
               <div className="connection-copy">
                 <span className="shield-icon" aria-hidden="true">✓</span>
@@ -187,9 +196,10 @@ export default function App() {
                   >
                     {showApiKey ? "Hide" : "Show"}
                   </button>
-                  <button className="connect-button" disabled={!draftApiKey.trim()} type="submit">
+                  <button className="connect-button" disabled={loading || !draftApiKey.trim()} type="submit">
                     Use this key
                   </button>
+                  {editingKey && <button type="button" onClick={() => { setEditingKey(false); setDraftApiKey(""); setShowApiKey(false); }}>Cancel</button>}
                 </div>
               </form>
 
@@ -214,7 +224,7 @@ export default function App() {
             </section>
           )}
 
-          {(mode === "retrieval" || apiKey) && <form className="search-form" onSubmit={submit}>
+          <form className="search-form" onSubmit={submit}>
             <label className="sr-only" htmlFor="question">Your question</label>
             <div className="question-box">
               <textarea
@@ -232,13 +242,13 @@ export default function App() {
                 aria-describedby="question-help"
               />
               <button disabled={loading || query.trim().length < 3} type="submit">
-                {loading ? "Searching…" : mode === "retrieval" ? "Search sources" : "Ask JKUAI"}
+                {loading ? "Searching…" : "Ask JKUAI"}
               </button>
             </div>
             <p id="question-help" className="question-help">Press Enter to search · Shift + Enter for a new line</p>
-          </form>}
+          </form>
 
-          {(mode === "retrieval" || apiKey) && <div className="examples" aria-label="Example questions">
+          <div className="examples" aria-label="Example questions">
             <span>Try an example</span>
             <div className="example-list">
               {EXAMPLE_QUESTIONS.map((example) => (
@@ -247,7 +257,7 @@ export default function App() {
                 </button>
               ))}
             </div>
-          </div>}
+          </div>
         </section>
 
         {loading && (
@@ -263,22 +273,22 @@ export default function App() {
         {error && (
           <section className="error-card" role="alert">
             <div>
-              <strong>We couldn’t complete that search.</strong>
+              <strong>We couldn’t generate an answer.</strong>
               <p>{error}</p>
             </div>
             <button
-              onClick={() => (mode === "retrieval" || apiKey) ? void runSearch(query) : setError("")}
+              onClick={() => void runSearch(query)}
               type="button"
             >
-              {(mode === "retrieval" || apiKey) ? "Try again" : "Enter another key"}
+              Try again
             </button>
           </section>
         )}
 
-        {(mode === "retrieval" || apiKey) && !loading && !error && !result && (
+        {!loading && !error && !result && (
           <section className="how-it-works" aria-label="How search works">
             <div><span>1</span><p><strong>Ask naturally</strong>Use the same words you would use when asking a study advisor.</p></div>
-            <div><span>2</span><p><strong>Review the results</strong>Inspect ranked passages or generate an answer with citations.</p></div>
+            <div><span>2</span><p><strong>Review the results</strong>Read the answer and follow its source tags to the supporting passages.</p></div>
             <div><span>3</span><p><strong>Check the sources</strong>Read source passages and open linked documents to verify important details.</p></div>
           </section>
         )}
@@ -288,17 +298,17 @@ export default function App() {
             <article className="answer-panel">
               <div className="panel-heading">
                 <div>
-                  <p className="section-label">{mode === "retrieval" ? "RETRIEVAL RESULTS" : "ANSWER"}</p>
-                  <h2>{sourceCount > 0 ? (mode === "retrieval" ? "Ranked source passages" : "Based on retrieved documents") : "No matching source found"}</h2>
+                  <p className="section-label">{mode === "retrieval" || answerUnavailable ? "SOURCE RESULTS" : "ANSWER"}</p>
+                  <h2>{sourceCount > 0 ? (mode === "retrieval" || answerUnavailable ? "Retrieved source passages" : "Based on retrieved documents") : "No matching source found"}</h2>
                 </div>
                 <span className="source-count">{sourceCount} {sourceCount === 1 ? "source" : "sources"}</span>
               </div>
 
               <p className="answer-text">
-                <AnswerText answer={result.answer} sources={result.sources} />
+                <AnswerText answer={answerUnavailable ? "Answer generation failed. You can still inspect the retrieved passages below." : result.answer} sources={result.sources} />
               </p>
 
-              {mode === "answer" && sourceCount > 0 && (
+              {mode === "answer" && !answerUnavailable && sourceCount > 0 && (
                 <div className="verification-note">
                   <span aria-hidden="true">✓</span>
                   <p><strong>Easy to verify</strong>Select a citation in the answer or open a source document to check the information.</p>
@@ -307,7 +317,7 @@ export default function App() {
 
               {result.exact_documents_used.length > 0 && (
                 <details className="documents-used">
-                  <summary>{mode === "retrieval" ? "Retrieved documents" : "Documents cited in this answer"} ({result.exact_documents_used.length})</summary>
+                  <summary>{mode === "retrieval" || answerUnavailable ? "Retrieved documents" : "Documents cited in this answer"} ({result.exact_documents_used.length})</summary>
                   <ul>
                     {result.exact_documents_used.map((name) => <li key={name}>{name}</li>)}
                   </ul>
@@ -319,7 +329,7 @@ export default function App() {
               <div className="sources-heading">
                 <div>
                   <p className="section-label">SOURCES</p>
-                  <h2>{mode === "retrieval" ? "Sources to inspect" : "Passages supplied to the model"}</h2>
+                  <h2>Sources to inspect</h2>
                 </div>
                 <span>{Math.round(result.latency_ms) / 1000}s</span>
               </div>
@@ -331,10 +341,10 @@ export default function App() {
                 </div>
               ) : (
                 <div className="source-list">
-                  {result.sources.map((source, index) => (
+                  {result.sources.map((source) => (
                     <article id={source.citation_id} key={source.chunk_id} className="source-card">
                       <div className="source-meta">
-                        <span className="source-number">{index + 1}</span>
+                        <a className="citation" href={`#${source.citation_id}`}>[{source.citation_id}]</a>
                         <span>{source.page_number ? `Page ${source.page_number}` : "Page not listed"}</span>
                       </div>
                       <h3>{source.title}</h3>

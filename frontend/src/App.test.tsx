@@ -5,31 +5,59 @@ import userEvent from "@testing-library/user-event";
 import App from "./App";
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+const sources = [{ citation_id: "S1", chunk_id: "chunk", title: "Guide", excerpt: "Contact office@example.org", page_number: 1 }];
+const result = { answer: "Contact office@example.org [S1]", sources, exact_documents_used: ["Guide"], latency_ms: 1 };
 
-it("lets visitors retrieve source passages without entering a key", async () => {
-  const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ sources: [], exact_documents_used: [], latency_ms: 1 }) });
+it("uses one question flow and shows sources without a key", async () => {
+  const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ...result, answer: undefined }) });
   vi.stubGlobal("fetch", fetch);
   const user = userEvent.setup();
   render(<App />);
-  expect(screen.queryByLabelText("OpenAI API key")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Search sources" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Answer with citations" })).toBeNull();
   await user.type(screen.getByLabelText("Your question"), "course requirements");
-  await user.click(screen.getAllByRole("button", { name: "Search sources" })[1]);
+  await user.click(screen.getByRole("button", { name: "Ask JKUAI" }));
   await waitFor(() => expect(fetch).toHaveBeenCalledOnce());
   expect(fetch.mock.calls[0][0]).toMatch(/\/search\/retrieval$/);
-  expect(await screen.findByText("No matching source found", { selector: "h2" })).toBeTruthy();
+  expect(await screen.findByRole("link", { name: "[S1]" })).toBeTruthy();
 });
 
-it("requires a tab-scoped key only for the answer mode", async () => {
+it("replaces a tab-scoped key and submits the new key with cited answers", async () => {
+  const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => result });
+  vi.stubGlobal("fetch", fetch);
   const user = userEvent.setup();
   render(<App />);
-  await user.click(screen.getByRole("button", { name: "Answer with citations" }));
-  expect(screen.getByLabelText("OpenAI API key")).toBeTruthy();
-  expect(screen.queryByLabelText("Your question")).toBeNull();
-  await user.type(screen.getByLabelText("OpenAI API key"), "sk-test");
+  await user.type(screen.getByLabelText("OpenAI API key"), "sk-old");
   await user.click(screen.getByRole("button", { name: "Use this key" }));
-  expect(screen.getByLabelText("Your question")).toBeTruthy();
+  await user.type(screen.getByLabelText("Your question"), "contact email");
+  await user.click(screen.getByRole("button", { name: "Change API key" }));
+  expect((screen.getByLabelText("OpenAI API key") as HTMLInputElement).value).toBe("");
+  await user.type(screen.getByLabelText("OpenAI API key"), "sk-new");
+  await user.click(screen.getByRole("button", { name: "Use this key" }));
+  await user.click(screen.getByRole("button", { name: "Ask JKUAI" }));
+  await screen.findByText("Based on retrieved documents");
+  expect(fetch.mock.calls[0][1].headers["X-OpenAI-API-Key"]).toBe("sk-new");
+  expect(screen.getAllByRole("link", { name: /S1/ }).length).toBe(2);
   expect(localStorage.length).toBe(0);
   expect(sessionStorage.length).toBe(0);
   await user.click(screen.getByRole("button", { name: "Disconnect" }));
   expect(screen.getByLabelText("OpenAI API key")).toBeTruthy();
+});
+
+it("keeps sources and the question when generation fails and allows changing keys", async () => {
+  const fetch = vi.fn()
+    .mockResolvedValueOnce({ ok: false, status: 429, json: async () => ({ detail: { code: "openai_quota_exhausted" } }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ ...result, answer: undefined }) });
+  vi.stubGlobal("fetch", fetch);
+  const user = userEvent.setup();
+  render(<App />);
+  await user.type(screen.getByLabelText("OpenAI API key"), "sk-test");
+  await user.click(screen.getByRole("button", { name: "Use this key" }));
+  await user.type(screen.getByLabelText("Your question"), "contact email");
+  await user.click(screen.getByRole("button", { name: "Ask JKUAI" }));
+  expect(await screen.findByRole("alert")).toHaveProperty("textContent", expect.stringContaining("exhausted API credit"));
+  expect(await screen.findByText("Retrieved source passages")).toBeTruthy();
+  expect(screen.getByText("Contact office@example.org")).toBeTruthy();
+  expect(fetch.mock.calls[1][1].headers).not.toHaveProperty("X-OpenAI-API-Key");
+  expect(screen.getByRole("button", { name: "Change API key" })).toBeTruthy();
 });

@@ -19,7 +19,7 @@ content, add the official curriculum using the README instructions and ask the w
 Master’s thesis credit question. Do not attribute the fictional course prerequisites
 to that curriculum.
 
-Open <http://localhost:5173> and use **Search sources** first; it needs no OpenAI key.
+Open <http://localhost:5173> and use **Ask JKUAI** first; without a key it shows retrieved passages.
 
 ## A five-minute walkthrough
 
@@ -28,7 +28,7 @@ Open <http://localhost:5173> and use **Search sources** first; it needs no OpenA
 | 0:00–0:45 | Introduce the problem | University information is scattered across PDFs. Search needs exact identifiers, semantic matches, and traceable answers. |
 | 0:45–1:45 | Choose Public visitor; ask “What do I need before taking Advanced Machine Learning?” | Read the course-guide excerpt and show its page and filename. Explain lexical retrieval plus embeddings, then fusion and reranking. |
 | 1:45–2:45 | Ask “What is the EXAM-OPS-42 internal routing code?” as Public visitor, then Staff member | Public/student searches must not contain the staff operations document or ORCHID-742. Staff can retrieve it. Public search may still return unrelated public passages; do not describe that as a confidence score. |
-| 2:45–3:45 | Choose Answer with citations and use a working OpenAI API key | Ask the course prerequisite question again. Click [S1] to inspect the supporting passage. Explain that retrieval is local; the permitted passages and question go to OpenAI for generation. |
+| 2:45–3:45 | Connect a working OpenAI API key | Ask the course prerequisite question again. Click [S1] to inspect the supporting passage. Explain that retrieval is local; the permitted passages and question go to OpenAI for generation. |
 | 3:45–4:30 | Open `services/search.py` and the live integration test | Point out the SQL and OpenSearch filters and the PostgreSQL recheck on lexical hits. The revocation test deliberately leaves the lexical ACL stale. |
 | 4:30–5:00 | Discuss one limitation and next step | Real identity verification is the next security boundary. Outbox-backed ingestion is the next reliability improvement. |
 

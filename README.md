@@ -43,7 +43,7 @@ writes the PDFs and check report to `data/demo-output/`. These examples demonstr
 pipeline; they are not actual university regulations. Repeating the seed is safe and
 checks deduplication.
 
-Open **<http://localhost:5173>**. Select **Search sources** and try:
+Open **<http://localhost:5173>**. Use **Ask JKUAI** and try:
 
 | Role | Question | Expected result |
 |---|---|---|
@@ -69,7 +69,7 @@ reuploading is not an ACL-edit operation.
 
 ### Generate an answer
 
-Switch to **Answer with citations**, enter a working OpenAI API key, and ask the course
+Enter a working OpenAI API key, and ask the course
 prerequisite question. This is the only step requiring a paid provider account and
 network access to OpenAI. The default model is `gpt-4.1-mini`; set `OPENAI_MODEL` in an
 optional root `.env` and recreate the API to change it.
@@ -178,3 +178,17 @@ See [architecture](docs/architecture.md), [security](docs/security.md),
 ## License
 
 [MIT](LICENSE).
+
+### API keys and answer failures
+
+There is one **Ask JKUAI** flow. With a key it generates an answer with clickable
+`[S1]` source tags. Without a key it clearly labels the results as retrieved passages.
+Use **Change API key** in the header to replace a key without losing your question.
+The status **API key set** means the key is entered, not that billing has been verified.
+Keys remain in tab memory and are cleared on refresh or Disconnect.
+
+If generation fails, the page keeps accessible source passages visible and shows the
+provider failure separately. Exhausted API credit/billing limits require checking the
+key's OpenAI project billing; a temporary rate limit calls for waiting before retrying.
+Creating another key in the same exhausted project does not replenish its credit.
+No key or raw provider error is returned in diagnostic messages.

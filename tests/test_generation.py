@@ -93,3 +93,46 @@ def test_generation_uses_real_sdk_request_and_response_contract():
     assert requests[0]["store"] is False
     assert requests[0]["max_output_tokens"] == 700
     assert HITS[0]["content"] in requests[0]["input"]
+
+
+@pytest.mark.parametrize(
+    "code,error_type,expected",
+    [
+        ("insufficient_quota", "insufficient_quota", "OpenAIQuotaError"),
+        ("credit_balance_exhausted", "insufficient_quota", "OpenAIQuotaError"),
+        ("rate_limit_exceeded", "tokens", "OpenAIRateLimitError"),
+        ("slow_down", "rate_limit_error", "OpenAIRateLimitError"),
+    ],
+)
+def test_real_sdk_provider_errors_are_classified_without_leaking_secrets(
+    code, error_type, expected
+):
+    import httpx
+    from app.services import generation
+    from openai import OpenAI as SDKClient
+
+    def provider(request):
+        assert request.headers["authorization"] == "Bearer sk-secret"
+        return httpx.Response(
+            429,
+            json={
+                "error": {
+                    "message": "provider detail sk-secret",
+                    "type": error_type,
+                    "code": code,
+                }
+            },
+        )
+
+    def make_client(**kwargs):
+        kwargs["max_retries"] = 0
+        return SDKClient(
+            **kwargs, http_client=httpx.Client(transport=httpx.MockTransport(provider))
+        )
+
+    with (
+        patch("app.services.generation.OpenAI", side_effect=make_client),
+        pytest.raises(getattr(generation, expected)) as caught,
+    ):
+        _generate_answer_sync("What is required?", HITS, "sk-secret")
+    assert "sk-secret" not in str(caught.value)
