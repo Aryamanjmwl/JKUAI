@@ -3,30 +3,28 @@ import { expect, test } from "@playwright/test";
 test("a fresh reviewer can retrieve sources and inspect permission isolation", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "What would you like to know?" })).toBeVisible();
-  await expect(page.getByLabel("OpenAI API key", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("OpenAI API key", { exact: true })).toBeVisible();
   await page.getByLabel("Simulated role").selectOption("");
   await page.getByLabel("Your question").fill("What do I need before taking Advanced Machine Learning?");
-  await page.locator("form.search-form").getByRole("button", { name: "Search sources" }).click();
+  await page.locator("form.search-form").getByRole("button", { name: "Ask JKUAI" }).click();
   await expect(page.locator(".source-card").filter({ hasText: "Course Guide" })).toBeVisible();
   await expect(page.locator(".source-card").filter({ hasText: "Course Guide" })).toContainText("Linear Algebra");
 
   await page.getByLabel("Your question").fill("What is the EXAM-OPS-42 internal routing code?");
-  await page.locator("form.search-form").getByRole("button", { name: "Search sources" }).click();
-  await expect(page.getByRole("heading", { name: "Ranked source passages" })).toBeVisible();
+  await page.locator("form.search-form").getByRole("button", { name: "Ask JKUAI" }).click();
+  await expect(page.getByRole("heading", { name: "Retrieved source passages" })).toBeVisible();
   await expect(page.locator(".source-card").filter({ hasText: "Staff Operations" })).toHaveCount(0);
   await expect(page.locator(".results")).not.toContainText("ORCHID-742");
 
   await page.getByLabel("Simulated role").selectOption("staff");
   await expect(page.locator(".results")).toHaveCount(0);
-  await page.locator("form.search-form").getByRole("button", { name: "Search sources" }).click();
+  await page.locator("form.search-form").getByRole("button", { name: "Ask JKUAI" }).click();
   await expect(page.locator(".source-card").filter({ hasText: "Staff Operations" })).toContainText("ORCHID-742");
   const staffPassage = page.locator(".source-card").filter({ hasText: "Staff Operations" }).locator("p");
   expect(await staffPassage.evaluate((element) => element.scrollHeight <= element.clientHeight + 1)).toBe(true);
   await page.screenshot({ path: "test-results/staff-source-search.png", fullPage: true });
 
-  await page.getByRole("button", { name: "Answer with citations" }).click();
-  await expect(page.getByLabel("OpenAI API key", { exact: true })).toBeVisible();
-  await expect(page.locator(".results")).toHaveCount(0);
+
 });
 
 test("source search fits a phone viewport", async ({ page }) => {
@@ -73,7 +71,44 @@ test("a reviewer can upload a PDF from the page and retrieve its content", async
   await page.screenshot({ path: "test-results/document-upload.png", fullPage: true });
   await page.getByRole("button", { name: "Close upload", exact: true }).click();
   await page.getByLabel("Your question").fill("When can I book the NOVA lab?");
-  await page.locator("form.search-form").getByRole("button", { name: "Search sources" }).click();
+  await page.locator("form.search-form").getByRole("button", { name: "Ask JKUAI" }).click();
   await expect(page.locator(".source-card").first()).toContainText("Browser Uploaded Lab Guide");
   await expect(page.locator(".source-card").first()).toContainText("Tuesday");
+});
+
+test("answer flow recovers from exhausted credit after changing the API key", async ({ page }) => {
+  // Provider responses are simulated here; real retrieval is covered above.
+  const source = { citation_id: "S1", chunk_id: "contact", title: "Contact guide", page_number: 1, excerpt: "Contact office@example.org", source_url: null };
+  await page.route("**/search/retrieval", async (route) => {
+    expect(route.request().headers()["x-openai-api-key"]).toBeUndefined();
+    await route.fulfill({ json: { sources: [source], exact_documents_used: ["guide.pdf"], latency_ms: 1 } });
+  });
+  await page.route(/\/search$/, async (route) => {
+    const key = route.request().headers()["x-openai-api-key"];
+    if (key === "sk-browser-old") {
+      await route.fulfill({ status: 429, json: { detail: { code: "openai_quota_exhausted" } } });
+    } else {
+      expect(key).toBe("sk-browser-new");
+      await route.fulfill({ json: { answer: "Contact office@example.org [S1]", sources: [source], exact_documents_used: ["guide.pdf"], latency_ms: 1 } });
+    }
+  });
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Search sources" })).toHaveCount(0);
+  await page.getByLabel("OpenAI API key", { exact: true }).fill("sk-browser-old");
+  await page.getByRole("button", { name: "Use this key" }).click();
+  await page.getByLabel("Your question").fill("What is the contact email?");
+  await page.getByRole("button", { name: "Ask JKUAI" }).click();
+  await expect(page.getByRole("alert")).toContainText("exhausted API credit");
+  await expect(page.locator(".source-card")).toContainText("office@example.org");
+  await page.getByRole("button", { name: "Change API key" }).click();
+  await expect(page.getByLabel("OpenAI API key", { exact: true })).toHaveValue("");
+  await page.getByLabel("OpenAI API key", { exact: true }).fill("sk-browser-new");
+  await page.getByRole("button", { name: "Use this key" }).click();
+  await expect(page.getByLabel("Your question")).toHaveValue("What is the contact email?");
+  await page.getByRole("button", { name: "Ask JKUAI" }).click();
+  await expect(page.locator(".answer-text")).toContainText("Contact office@example.org [S1]");
+  await page.locator(".answer-text .citation").click();
+  await expect(page).toHaveURL(/#S1$/);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await page.screenshot({ path: "test-results/answer-source-tags.png", fullPage: true });
 });

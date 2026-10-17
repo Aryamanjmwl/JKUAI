@@ -44,8 +44,14 @@ export async function searchKnowledge(
       );
     }
     if (response.status === 429) {
+      const body = await response.json().catch(() => ({})) as { detail?: { code?: string } };
+      const code = body.detail?.code;
       throw new SearchError(
-        "This OpenAI account has reached a rate or spending limit. Check its API billing and usage, then try again.",
+        code === "openai_quota_exhausted"
+          ? "OpenAI reports exhausted API credit or a billing limit for this key's project. Check API billing or change your API key."
+          : code === "openai_rate_limited"
+            ? "OpenAI temporarily rate-limited this request. Wait a moment before trying again."
+            : "OpenAI rejected this request with a rate or usage limit. Check API usage and billing, or change your API key.",
         response.status,
       );
     }
@@ -67,7 +73,7 @@ export async function searchKnowledge(
     );
   }
   const result = await response.json() as SearchResult;
-  return { ...result, answer: result.answer ?? "Explore the ranked passages below. Choose Answer with citations to generate a response from these sources." };
+  return { ...result, answer: result.answer ?? "These are retrieved passages, not a generated answer. Connect an API key to get an answer with source tags." };
 }
 
 export async function uploadDocument(

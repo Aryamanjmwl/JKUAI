@@ -20,6 +20,7 @@ from .security import get_user_context
 from .services.generation import (
     InvalidOpenAICredentialsError,
     OpenAIQuotaError,
+    OpenAIRateLimitError,
     OpenAIServiceError,
     cited_source_ids,
     generate_answer,
@@ -134,7 +135,9 @@ async def search(
     except InvalidOpenAICredentialsError as exc:
         raise HTTPException(401, "The OpenAI API key was not accepted") from exc
     except OpenAIQuotaError as exc:
-        raise HTTPException(429, "The OpenAI account has no available quota") from exc
+        raise HTTPException(429, {"code": "openai_quota_exhausted"}) from exc
+    except OpenAIRateLimitError as exc:
+        raise HTTPException(429, {"code": "openai_rate_limited"}) from exc
     except OpenAIServiceError as exc:
         raise HTTPException(502, "OpenAI is temporarily unavailable") from exc
     sources = _build_sources(hits)

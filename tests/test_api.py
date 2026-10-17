@@ -9,6 +9,7 @@ from app.security import get_user_context
 from app.services.generation import (
     InvalidOpenAICredentialsError,
     OpenAIQuotaError,
+    OpenAIRateLimitError,
     OpenAIServiceError,
 )
 from fastapi.testclient import TestClient
@@ -73,6 +74,7 @@ def test_answer_lists_only_documents_actually_cited(client, hits):
     [
         (InvalidOpenAICredentialsError, 401),
         (OpenAIQuotaError, 429),
+        (OpenAIRateLimitError, 429),
         (OpenAIServiceError, 502),
     ],
 )
@@ -84,6 +86,10 @@ def test_provider_errors_have_stable_http_responses(client, hits, error, status)
         response = client.post("/search", json={"query": "course requirements"})
     assert response.status_code == status
     assert "detail" in response.json()
+    if error is OpenAIQuotaError:
+        assert response.json()["detail"] == {"code": "openai_quota_exhausted"}
+    if error is OpenAIRateLimitError:
+        assert response.json()["detail"] == {"code": "openai_rate_limited"}
 
 
 @pytest.mark.parametrize("query", ["   ", " x ", "x" * 1001])

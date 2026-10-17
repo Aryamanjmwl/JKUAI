@@ -23,7 +23,7 @@ describe("search API", () => {
   });
 
   it.each([401, 403, 429, 502, 422])("reports HTTP %s without exposing the response body", async (status) => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status }));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status, json: async () => ({}) }));
     await expect(searchKnowledge("course requirements", [], "key")).rejects.toMatchObject({ name: "SearchError", status });
   });
 
@@ -53,4 +53,12 @@ describe("document upload API", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 422, json: async () => ({ detail: "No extractable text found in PDF" }) }));
     await expect(uploadDocument({ file: new File(["data"], "scan.pdf"), title: "Scan", sourceUrl: "", visibility: "public", allowedGroups: "" }, [])).rejects.toThrow("No extractable text");
   });
+});
+
+it.each([
+  ["openai_quota_exhausted", "exhausted API credit"],
+  ["openai_rate_limited", "temporarily rate-limited"],
+])("distinguishes provider failure %s", async (code, message) => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 429, json: async () => ({ detail: { code } }) }));
+  await expect(searchKnowledge("question", [], "key")).rejects.toThrow(message);
 });
