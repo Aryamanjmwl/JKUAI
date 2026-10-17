@@ -274,7 +274,7 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp
 .source-meta { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 12px; }
 .source-number { display: grid; place-items: center; width: 23px; height: 23px; border-radius: 6px; color: white; background: var(--green-700); font-weight: 800; }
 .source-card h3 { margin: 12px 0 8px; font-size: 15px; line-height: 1.35; }
-.source-card p { display: -webkit-box; overflow: hidden; margin: 0 0 13px; color: var(--muted); font-size: 13px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
+.source-card p { overflow-wrap: anywhere; margin: 0 0 13px; color: var(--muted); font-size: 13px; line-height: 1.55; }
 .source-card a { color: var(--green-700); font-size: 13px; font-weight: 750; text-decoration: none; }
 .source-card a:hover { text-decoration: underline; }
 .no-sources { margin-top: 20px; padding: 18px; border-radius: 10px; background: #f2f5f3; }

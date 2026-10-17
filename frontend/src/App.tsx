@@ -265,8 +265,8 @@ export default function App() {
         {(mode === "retrieval" || apiKey) && !loading && !error && !result && (
           <section className="how-it-works" aria-label="How search works">
             <div><span>1</span><p><strong>Ask naturally</strong>Use the same words you would use when asking a study advisor.</p></div>
-            <div><span>2</span><p><strong>Read the answer</strong>JKUAI combines information found in relevant documents.</p></div>
-            <div><span>3</span><p><strong>Check the sources</strong>Open the exact documents and pages used for the answer.</p></div>
+            <div><span>2</span><p><strong>Review the results</strong>Inspect ranked passages or generate an answer with citations.</p></div>
+            <div><span>3</span><p><strong>Check the sources</strong>Read source passages and open linked documents to verify important details.</p></div>
           </section>
         )}
 
@@ -341,7 +341,7 @@ export default function App() {
       </main>
 
       <footer>
-        <p>JKUAI may make mistakes. Confirm important requirements in the linked official documents.</p>
+        <p>JKUAI may make mistakes. Confirm important requirements against the original documents.</p>
       </footer>
     </div>
   );

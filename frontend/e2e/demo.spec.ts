@@ -20,6 +20,8 @@ test("a fresh reviewer can retrieve sources and inspect permission isolation", a
   await expect(page.locator(".results")).toHaveCount(0);
   await page.locator("form.search-form").getByRole("button", { name: "Search sources" }).click();
   await expect(page.locator(".source-card").filter({ hasText: "Staff Operations" })).toContainText("ORCHID-742");
+  const staffPassage = page.locator(".source-card").filter({ hasText: "Staff Operations" }).locator("p");
+  expect(await staffPassage.evaluate((element) => element.scrollHeight <= element.clientHeight + 1)).toBe(true);
   await page.screenshot({ path: "test-results/staff-source-search.png", fullPage: true });
 
   await page.getByRole("button", { name: "Answer with citations" }).click();
