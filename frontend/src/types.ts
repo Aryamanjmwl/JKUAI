@@ -16,3 +16,10 @@ export interface SearchResult {
   exact_documents_used: string[];
   latency_ms: number;
 }
+
+export interface IngestResult {
+  document_id: string;
+  title: string;
+  chunks_created: number;
+  duplicate: boolean;
+}

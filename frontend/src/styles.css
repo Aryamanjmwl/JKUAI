@@ -335,3 +335,17 @@ footer p { margin: 0; font-size: 12px; }
 .search-modes button { padding: 0.7rem 1rem; border: 1px solid #687d70; border-radius: 8px; background: white; color: #264c3c; cursor: pointer; font: inherit; }
 .search-modes button[aria-pressed="true"] { background: #264c3c; color: white; }
 .search-modes button:disabled { opacity: 0.6; cursor: wait; }
+
+.upload-toggle, .upload-submit { padding: 9px 14px; border: 1px solid var(--green-700); border-radius: 8px; background: white; color: var(--green-700); font: inherit; cursor: pointer; }
+.upload-panel { max-width: 860px; margin: 0 auto 36px; padding: 24px; border: 1px solid var(--line); border-radius: 12px; background: white; }
+.upload-panel h2 { margin: 0 0 8px; }
+.upload-panel > p { line-height: 1.5; }
+.upload-panel fieldset { display: grid; gap: 10px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.upload-panel label { margin-top: 8px; font-size: 14px; font-weight: 700; }
+.upload-panel input, .upload-panel select { width: 100%; min-width: 0; padding: 10px; border: 1px solid #b8c7bd; border-radius: 6px; font: inherit; }
+.upload-hint { margin: 0; color: var(--muted); font-size: 13px; }
+.upload-submit { justify-self: start; margin-top: 12px; background: var(--green-700); color: white; }
+.upload-submit:disabled { opacity: 0.6; cursor: default; }
+.upload-error { color: #8b281d; }
+.upload-success { color: var(--green-700); font-weight: 650; }
+@media (max-width: 600px) { .upload-toggle { font-size: 12px; padding: 8px; } .upload-panel { padding: 18px; } }
