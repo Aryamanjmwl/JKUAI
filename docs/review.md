@@ -46,7 +46,7 @@ Local checks on 17 October 2026:
 
 - `ruff check .`: passed.
 - `ruff format --check .`: passed.
-- `pytest -q`: 53 passed; two live-stack tests skipped by default.
+- `pytest -q`: 54 passed; two live-stack tests skipped by default.
 - `npm test`: 10 passed, including rendered client interaction tests.
 - `npm run build`: passed.
 - Synthetic PDF generation is deterministic and round-trips through the actual parser.
@@ -96,3 +96,6 @@ runs two Chromium checks against the actual containers: source/role behavior and
 mobile layout. Its artifact includes screenshots, traces on failure, the check report,
 and service logs. The [PR checks](https://github.com/Aryamanjmwl/JKUAI/pull/2/checks)
 record the result for each revision. This still does not make a paid OpenAI call.
+
+Source excerpts now contain the complete retrieved chunk rather than a 500-character
+prefix, allowing inspection of supporting statements anywhere in the supplied passage.

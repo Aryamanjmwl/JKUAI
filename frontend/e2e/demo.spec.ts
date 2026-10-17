@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("a fresh reviewer can retrieve sources and inspect permission isolation", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "What would you like to know?" })).toBeVisible();
-  await expect(page.getByLabel("OpenAI API key")).toHaveCount(0);
+  await expect(page.getByLabel("OpenAI API key", { exact: true })).toHaveCount(0);
   await page.getByLabel("Simulated role").selectOption("");
   await page.getByLabel("Your question").fill("What do I need before taking Advanced Machine Learning?");
   await page.locator("form.search-form").getByRole("button", { name: "Search sources" }).click();
@@ -23,7 +23,7 @@ test("a fresh reviewer can retrieve sources and inspect permission isolation", a
   await page.screenshot({ path: "test-results/staff-source-search.png", fullPage: true });
 
   await page.getByRole("button", { name: "Answer with citations" }).click();
-  await expect(page.getByLabel("OpenAI API key")).toBeVisible();
+  await expect(page.getByLabel("OpenAI API key", { exact: true })).toBeVisible();
   await expect(page.locator(".results")).toHaveCount(0);
 });
 
