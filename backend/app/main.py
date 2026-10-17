@@ -174,7 +174,7 @@ def _build_sources(hits: list[dict]) -> list[Source]:
             file_name=hit["file_name"],
             source_url=hit["source_url"],
             page_number=hit["page_number"],
-            excerpt=hit["content"][:500],
+            excerpt=hit["content"],
             score=hit["rerank_score"],
         )
         for i, hit in enumerate(hits, start=1)

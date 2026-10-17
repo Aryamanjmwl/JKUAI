@@ -65,8 +65,8 @@ or resistance to prompt injection.
 
 `sources` contains all passages supplied to the model. In a generated answer,
 `exact_documents_used` lists the unique filenames referenced by recognized citation IDs;
-in a retrieval-only response it lists the unique retrieved filenames. Excerpts are
-truncated to 500 characters for display, while the model receives complete chunks.
+in a retrieval-only response it lists the unique retrieved filenames. Source excerpts contain the complete retrieved chunk, so a reviewer can inspect the
+same passage that the model received even when no external source URL was provided.
 
 ## Trust boundary
 

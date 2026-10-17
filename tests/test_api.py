@@ -167,3 +167,11 @@ def test_supported_local_browser_origins(client, origin):
     )
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == origin
+
+
+def test_source_excerpts_include_the_entire_passage_supplied_to_generation(client, hits):
+    hits[0]["content"] = "Context. " * 70 + "The supporting statement appears at the end."
+    with patch("app.main.hybrid_search", AsyncMock(return_value=hits)):
+        response = client.post("/search/retrieval", json={"query": "supporting statement"})
+    assert response.status_code == 200
+    assert response.json()["sources"][0]["excerpt"] == hits[0]["content"]
