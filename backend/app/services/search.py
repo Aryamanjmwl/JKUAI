@@ -1,7 +1,7 @@
 from time import perf_counter
 from uuid import UUID
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth import UserContext
@@ -15,7 +15,13 @@ from .opensearch import search_async
 def _permission_clause(user: UserContext):
     if not user.groups:
         return Document.visibility == "public"
-    return or_(Document.visibility == "public", Document.allowed_groups.overlap(list(user.groups)))
+    return or_(
+        Document.visibility == "public",
+        and_(
+            Document.visibility == "restricted",
+            Document.allowed_groups.overlap(list(user.groups)),
+        ),
+    )
 
 
 async def hybrid_search(session: AsyncSession, query: str, user: UserContext) -> list[dict]:
@@ -60,7 +66,12 @@ async def hybrid_search(session: AsyncSession, query: str, user: UserContext) ->
     lexical_ids = [UUID(hit["_source"]["chunk_id"]) for hit in response["hits"]["hits"]]
     lexical_hits: list[dict] = []
     if lexical_ids:
-        lexical_stmt = select(Chunk, Document).join(Document).where(Chunk.id.in_(lexical_ids))
+        # PostgreSQL is authoritative: a stale lexical index must never bypass an ACL change.
+        lexical_stmt = (
+            select(Chunk, Document)
+            .join(Document)
+            .where(Chunk.id.in_(lexical_ids), _permission_clause(user))
+        )
         rows = (await session.execute(lexical_stmt)).all()
         by_id = {
             str(chunk.id): {

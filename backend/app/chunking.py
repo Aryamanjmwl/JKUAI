@@ -17,6 +17,8 @@ class TextChunk:
 def chunk_pages(
     pages: list[TextPage], chunk_size: int = 900, overlap: int = 150
 ) -> list[TextChunk]:
+    if chunk_size <= 0 or overlap < 0:
+        raise ValueError("chunk_size must be positive and overlap must be non-negative")
     if overlap >= chunk_size:
         raise ValueError("overlap must be smaller than chunk_size")
     chunks: list[TextChunk] = []

@@ -35,3 +35,7 @@ def test_rrf_rewards_results_found_by_both_retrievers():
     lexical = [{"chunk_id": "shared", "content": "a"}, {"chunk_id": "lexical", "content": "c"}]
     merged = reciprocal_rank_fusion(vector, lexical)
     assert merged[0]["chunk_id"] == "shared"
+
+
+def test_unknown_visibility_is_denied_even_for_matching_groups():
+    assert not can_access("deleted", ["staff"], UserContext("staff", ("staff",)))

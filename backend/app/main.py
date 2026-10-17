@@ -1,9 +1,11 @@
 from contextlib import asynccontextmanager
+from pathlib import PurePosixPath
 from time import perf_counter
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import HttpUrl, TypeAdapter, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .auth import UserContext
@@ -15,9 +17,10 @@ from .services.generation import (
     InvalidOpenAICredentialsError,
     OpenAIQuotaError,
     OpenAIServiceError,
+    cited_source_ids,
     generate_answer,
 )
-from .services.ingestion import ingest_pdf
+from .services.ingestion import DocumentConflictError, ingest_pdf
 from .services.opensearch import ensure_index_async
 from .services.search import hybrid_search
 
@@ -51,6 +54,7 @@ async def upload_document(
     file: Annotated[UploadFile, File()],
     title: Annotated[str, Form()],
     session: Annotated[AsyncSession, Depends(get_session)],
+    user: Annotated[UserContext, Depends(get_user_context)],
     source_url: Annotated[str | None, Form()] = None,
     visibility: Annotated[str, Form()] = "public",
     allowed_groups: Annotated[str, Form()] = "",
@@ -61,19 +65,38 @@ async def upload_document(
         raise HTTPException(400, "Only PDF files are supported in this version")
     if visibility not in {"public", "restricted"}:
         raise HTTPException(400, "visibility must be public or restricted")
+    title = title.strip()
+    if not title or len(title) > 500:
+        raise HTTPException(422, "title must contain between 1 and 500 characters")
+    if source_url:
+        try:
+            source_url = str(TypeAdapter(HttpUrl).validate_python(source_url))
+        except ValidationError as exc:
+            raise HTTPException(422, "source_url must be an HTTP or HTTPS URL") from exc
+        if len(source_url) > 2000:
+            raise HTTPException(422, "source_url must not exceed 2000 characters")
     groups = sorted({item.strip() for item in allowed_groups.split(",") if item.strip()})
     if visibility == "restricted" and not groups:
         raise HTTPException(400, "Restricted documents require at least one allowed group")
+    content = await file.read(get_settings().max_upload_bytes + 1)
+    if len(content) > get_settings().max_upload_bytes:
+        raise HTTPException(413, "PDF exceeds the configured upload limit")
+    file_name = PurePosixPath((file.filename or "document.pdf").replace("\\", "/")).name
+    if len(file_name) > 500:
+        raise HTTPException(422, "filename must not exceed 500 characters")
     try:
         document, count, duplicate = await ingest_pdf(
             session,
-            content=await file.read(),
-            file_name=file.filename or "document.pdf",
+            content=content,
+            file_name=file_name,
             title=title,
             source_url=source_url,
             visibility=visibility,
             allowed_groups=groups,
+            user=user,
         )
+    except DocumentConflictError as exc:
+        raise HTTPException(409, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     return IngestResponse(
@@ -102,7 +125,9 @@ async def search(
     return SearchResponse(
         answer=answer,
         sources=sources,
-        exact_documents_used=_document_names(sources),
+        exact_documents_used=_document_names(
+            [source for source in sources if source.citation_id in cited_source_ids(answer)]
+        ),
         latency_ms=round((perf_counter() - start) * 1000, 2),
     )
 

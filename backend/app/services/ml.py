@@ -1,18 +1,20 @@
 import asyncio
 from functools import lru_cache
 
-from sentence_transformers import CrossEncoder, SentenceTransformer
-
 from ..config import get_settings
 
 
 @lru_cache
-def embedding_model() -> SentenceTransformer:
+def embedding_model():
+    from sentence_transformers import SentenceTransformer
+
     return SentenceTransformer(get_settings().embedding_model)
 
 
 @lru_cache
-def reranker_model() -> CrossEncoder:
+def reranker_model():
+    from sentence_transformers import CrossEncoder
+
     return CrossEncoder(get_settings().reranker_model)
 
 
