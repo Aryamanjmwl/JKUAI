@@ -45,3 +45,51 @@ def test_valid_citation_ids_are_preserved():
     from app.services.generation import validate_answer
 
     assert validate_answer("Required. [S1]", 1) == "Required. [S1]"
+
+
+def test_generation_uses_real_sdk_request_and_response_contract():
+    import json
+
+    import httpx
+    from openai import OpenAI as SDKClient
+
+    requests = []
+
+    def provider(request):
+        requests.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={
+                "id": "resp_test",
+                "object": "response",
+                "created_at": 1,
+                "model": "gpt-4.1-mini",
+                "output": [
+                    {
+                        "type": "message",
+                        "id": "msg_test",
+                        "role": "assistant",
+                        "status": "completed",
+                        "content": [
+                            {
+                                "type": "output_text",
+                                "text": "Machine learning knowledge. [S1]",
+                                "annotations": [],
+                            }
+                        ],
+                    }
+                ],
+            },
+        )
+
+    def make_client(**kwargs):
+        return SDKClient(
+            **kwargs, http_client=httpx.Client(transport=httpx.MockTransport(provider))
+        )
+
+    with patch("app.services.generation.OpenAI", side_effect=make_client):
+        answer = _generate_answer_sync("What is required?", HITS, "sk-test")
+    assert answer == "Machine learning knowledge. [S1]"
+    assert requests[0]["store"] is False
+    assert requests[0]["max_output_tokens"] == 700
+    assert HITS[0]["content"] in requests[0]["input"]

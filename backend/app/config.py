@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://jku:jku@localhost:5432/jku_search"
     opensearch_url: str = "http://localhost:9200"
     opensearch_index: str = "jku_chunks"
-    openai_model: str = "gpt-5.6"
+    openai_model: str = "gpt-4.1-mini"
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     # The initial database migration creates a vector(384) column.

@@ -67,6 +67,8 @@ def _generate_answer_sync(query: str, hits: list[dict], api_key: str | None) -> 
             response = client.responses.create(
                 model=settings.openai_model,
                 instructions=SYSTEM_PROMPT,
+                store=False,
+                max_output_tokens=700,
                 input=f"Question: {query}\n\nSources:\n{context}",
             )
     except (AuthenticationError, PermissionDeniedError) as exc:
