@@ -1,5 +1,6 @@
 import argparse
 import json
+import math
 import statistics
 import time
 
@@ -12,6 +13,8 @@ def score_retrieval(
     *,
     k: int = 5,
 ) -> tuple[float, float]:
+    if k < 1:
+        raise ValueError("k must be positive")
     if not relevant_document_ids:
         raise ValueError("relevant_document_ids must contain at least one document")
 
@@ -26,6 +29,14 @@ def score_retrieval(
     return recall, reciprocal_rank
 
 
+def percentile_nearest_rank(values: list[float], percentile: float) -> float:
+    if not values:
+        raise ValueError("Cannot calculate a percentile from an empty dataset")
+    if not 0 < percentile <= 1:
+        raise ValueError("percentile must be greater than zero and at most one")
+    return sorted(values)[math.ceil(len(values) * percentile) - 1]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("dataset")
@@ -33,6 +44,8 @@ def main() -> None:
     args = parser.parse_args()
     with open(args.dataset, encoding="utf-8") as dataset:
         rows = [json.loads(line) for line in dataset if line.strip()]
+    if not rows:
+        parser.error("The dataset must contain at least one question")
     recalls, reciprocal_ranks, latencies = [], [], []
     with httpx.Client(timeout=120) as client:
         for row in rows:
@@ -55,9 +68,9 @@ def main() -> None:
             {
                 "questions": len(rows),
                 "recall_at_5": statistics.mean(recalls),
-                "mrr": statistics.mean(reciprocal_ranks),
+                "mrr_at_5": statistics.mean(reciprocal_ranks),
                 "latency_ms_mean": statistics.mean(latencies),
-                "latency_ms_p95": sorted(latencies)[max(0, int(len(latencies) * 0.95) - 1)],
+                "latency_ms_p95": percentile_nearest_rank(latencies, 0.95),
                 "answer_correctness": "Add an LLM-judge or human score in phase 2",
             },
             indent=2,
