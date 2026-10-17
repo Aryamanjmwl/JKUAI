@@ -330,3 +330,8 @@ footer p { margin: 0; font-size: 12px; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+.search-modes { display: flex; gap: 0.75rem; margin: 1.5rem 0; flex-wrap: wrap; }
+.search-modes button { padding: 0.7rem 1rem; border: 1px solid #687d70; border-radius: 8px; background: white; color: #264c3c; cursor: pointer; font: inherit; }
+.search-modes button[aria-pressed="true"] { background: #264c3c; color: white; }
+.search-modes button:disabled { opacity: 0.6; cursor: wait; }
