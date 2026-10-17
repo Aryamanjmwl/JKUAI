@@ -100,6 +100,8 @@ def test_generation_uses_real_sdk_request_and_response_contract():
     [
         ("insufficient_quota", "insufficient_quota", "OpenAIQuotaError"),
         ("credit_balance_exhausted", "insufficient_quota", "OpenAIQuotaError"),
+        ("organization_spend_limit_exceeded", None, "OpenAIQuotaError"),
+        ("project_spend_limit_exceeded", None, "OpenAIQuotaError"),
         ("rate_limit_exceeded", "tokens", "OpenAIRateLimitError"),
         ("slow_down", "rate_limit_error", "OpenAIRateLimitError"),
     ],

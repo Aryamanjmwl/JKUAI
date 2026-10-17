@@ -55,11 +55,13 @@ export default function App() {
     try {
       setResult(await searchKnowledge(cleanQuestion, group ? [group] : [], apiKey, mode));
     } catch (reason) {
-      setAnswerUnavailable(true);
+      setAnswerUnavailable(mode === "answer");
       // Keep accessible evidence visible even when the answer provider fails.
-      try {
-        setResult(await searchKnowledge(cleanQuestion, group ? [group] : [], "", "retrieval"));
-      } catch { /* Preserve the original failure rather than replacing it. */ }
+      if (mode === "answer") {
+        try {
+          setResult(await searchKnowledge(cleanQuestion, group ? [group] : [], "", "retrieval"));
+        } catch { /* Preserve the original failure rather than replacing it. */ }
+      }
       if (reason instanceof SearchError && reason.status === 401) {
         setApiKey("");
         setDraftApiKey("");
@@ -273,7 +275,7 @@ export default function App() {
         {error && (
           <section className="error-card" role="alert">
             <div>
-              <strong>We couldn’t generate an answer.</strong>
+              <strong>{answerUnavailable ? "We couldn’t generate an answer." : "We couldn’t complete that search."}</strong>
               <p>{error}</p>
             </div>
             <button

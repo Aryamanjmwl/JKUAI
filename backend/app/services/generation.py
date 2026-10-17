@@ -44,7 +44,7 @@ class InvalidOpenAICredentialsError(Exception):
 
 
 class OpenAIQuotaError(Exception):
-    """Raised when the credential has no available rate or billing quota."""
+    """Raised when the credential has no available credit or billing quota."""
 
 
 class OpenAIRateLimitError(Exception):
@@ -85,6 +85,8 @@ def _generate_answer_sync(query: str, hits: list[dict], api_key: str | None) -> 
             "billing_not_active",
             "usage_limit_reached",
             "organization_usage_limit_exceeded",
+            "organization_spend_limit_exceeded",
+            "project_spend_limit_exceeded",
         }
         if exc.code in billing_codes or exc.type == "insufficient_quota":
             raise OpenAIQuotaError from exc
