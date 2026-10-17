@@ -9,7 +9,7 @@ The project is designed to answer questions such as:
 
 > Which courses should I complete before taking Advanced Machine Learning?
 
-Every answer is grounded in retrieved document passages and returned with citations, page numbers, source links, and the exact filenames used.
+Answers are generated from retrieved passages with inline citations. Source cards expose page numbers, filenames, and source URLs when provided. Citation IDs are checked, but factual support still requires review.
 
 > [!NOTE]
 > JKUAI is an independent portfolio project. It is not an official service of Johannes Kepler University Linz.
@@ -42,7 +42,7 @@ flowchart TD
     G --> O["Answer + citations + exact documents"]
 ```
 
-Access filters are applied inside both retrieval paths before fusion and reranking. The system retrieves up to 20 candidates from each index, fuses the rankings with Reciprocal Rank Fusion, and reranks the merged candidates to the best five passages.
+Access filters are applied inside both retrieval paths before fusion and reranking. Lexical hits are also rechecked against the authoritative PostgreSQL ACL when their text is loaded. The system retrieves up to 20 candidates from each index, fuses the rankings with Reciprocal Rank Fusion, and reranks the merged candidates to the best five passages.
 
 ## Implemented capabilities
 
@@ -72,6 +72,16 @@ Access filters are applied inside both retrieval paths before fusion and reranki
 | Local infrastructure | Docker Compose |
 | Quality checks | pytest, Ruff, GitHub Actions |
 
+## Reproducible demo
+
+The [interview walkthrough](docs/interview-demo.md) covers Windows setup, model warmup,
+a key-free source-search demo, simulated role checks, and common interview questions.
+`python scripts/demo.py --check` creates clearly labelled fictional PDFs and exercises
+the live retrieval pipeline without relying on a university download or OpenAI quota.
+
+See [the implementation map](docs/architecture.md) for request flows and tradeoffs,
+and [the verification report](docs/review.md) for claim-by-claim evidence and limits.
+
 ## Run locally on Windows
 
 ### Prerequisites
@@ -97,7 +107,7 @@ Copy-Item .env.example .env
 ### 2. Start the indexes and API
 
 ```powershell
-docker compose up -d
+docker compose up -d --wait --wait-timeout 180
 docker compose ps
 alembic upgrade head
 uvicorn app.main:app --app-dir backend --reload
@@ -138,7 +148,8 @@ The ingestion response reports the document ID, number of chunks created, and wh
 
 ## Ask a question
 
-The local web client requests a user-provided OpenAI API key before generating an answer. The key is held in browser memory for the current tab and forwarded to the backend with each question; it is not written to application storage.
+The web client starts in **Search sources** mode, which requires no OpenAI key.
+Choose **Answer with citations** to generate an answer with a user-provided OpenAI API key. The key is held in browser memory for the current tab and forwarded to the backend with each question; it is not written to application storage.
 
 This bring-your-own-key flow is intended for local evaluation only. Do not enter an API key into an untrusted or publicly hosted copy of JKUAI. A production deployment should keep provider credentials in server-side secret storage and protect usage with authentication, rate limits, and spending controls.
 
@@ -151,7 +162,7 @@ curl.exe -X POST http://localhost:8000/search `
   -d '{"query":"Which courses are required before Advanced Machine Learning?"}'
 ```
 
-The response includes the generated answer, the five reranked sources, exact document filenames, and end-to-end latency.
+The response includes the generated answer, up to five reranked source passages, cited document filenames, and end-to-end latency.
 
 ## Permission model
 
@@ -185,7 +196,7 @@ python evaluation/evaluate.py evaluation/questions.jsonl
 The evaluator reports:
 
 - Recall@5
-- Mean Reciprocal Rank
+- Mean Reciprocal Rank at 5 (`mrr_at_5`)
 - mean retrieval latency
 - p95 retrieval latency
 
@@ -219,6 +230,8 @@ The first version performs synchronous writes to PostgreSQL and OpenSearch. A pr
 - The local API-key flow is not intended for a public multi-user deployment.
 - The repository provides an evaluation runner, but not a completed 50-question benchmark.
 - Index writes are synchronous and do not yet use an outbox or background worker.
+- Citation-ID validation does not establish that every claim follows from its cited passage.
+- There is no calibrated relevance threshold for nonempty retrieval results.
 
 ## Quality checks
 
@@ -229,10 +242,17 @@ pytest -q
 
 cd frontend
 npm ci
+npm test
 npm run build
 ```
 
-GitHub Actions runs the backend and frontend checks on every push to `main` and on pull requests.
+The opt-in live integration test uses actual PostgreSQL/pgvector, OpenSearch, and local
+ML models. With the API running in demo-role mode, use `RUN_INTEGRATION=1 pytest -q
+tests/integration` on Linux/macOS, or set `$env:RUN_INTEGRATION="1"` first in PowerShell.
+It tests duplicate uploads and permission revocation with deliberately stale lexical ACLs.
+No OpenAI credential is used in this job.
+
+GitHub Actions runs backend, frontend, and live-stack checks on pushes to `main` and on pull requests.
 
 ## Roadmap
 
