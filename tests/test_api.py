@@ -127,3 +127,43 @@ def test_upload_limit_is_enforced(client):
             files={"file": ("x.pdf", b"1234", "application/pdf")},
         )
     assert response.status_code == 413
+
+
+def test_readiness_checks_schema_and_lexical_index(client):
+    with patch("app.main.index_available_async", AsyncMock(return_value=True)):
+        response = client.get("/ready")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ready"
+    assert response.json()["demo_roles_enabled"] is False
+
+
+def test_readiness_is_unavailable_without_lexical_index(client):
+    with patch("app.main.index_available_async", AsyncMock(return_value=False)):
+        assert client.get("/ready").status_code == 503
+
+
+def test_readiness_is_unavailable_when_schema_query_fails(client):
+    from sqlalchemy.exc import OperationalError
+
+    async def failing_session():
+        session = AsyncMock()
+        session.execute.side_effect = OperationalError("query", {}, Exception("database down"))
+        yield session
+
+    app.dependency_overrides[get_session] = failing_session
+    with patch("app.main.index_available_async", AsyncMock(return_value=True)):
+        assert client.get("/ready").status_code == 503
+
+
+@pytest.mark.parametrize("origin", ["http://localhost:5173", "http://127.0.0.1:5173"])
+def test_supported_local_browser_origins(client, origin):
+    response = client.options(
+        "/search/retrieval",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == origin

@@ -15,7 +15,7 @@ Python, FastAPI, PostgreSQL/pgvector, OpenSearch, React, and Docker.
 | Grounded answers with citations | Retrieved passages sent through Responses API, source IDs, page metadata, excerpts, cited filenames | Syntax checks validate IDs, not factual entailment. Live provider answer quality was not evaluated during this review. |
 | Permission-aware retrieval | Both retrievers filter ACLs; lexical text is reauthorized in PostgreSQL | Default is public-only. Local role simulation is not authentication or SSO. |
 | React | TypeScript client with source search, answer mode, role demo, errors, and source cards | API keys remain in tab memory; use the key flow only on a trusted local instance. |
-| Docker | Compose runs PostgreSQL/pgvector and OpenSearch with health checks and persistent volumes | API and frontend run as host processes; this is not an all-services container deployment. |
+| Docker | Compose runs PostgreSQL/pgvector and OpenSearch with health checks and persistent volumes | The base profile supports native development; the explicit demo overlay also containerizes the API and web client. |
 
 The CV description is supportable as a description of a portfolio prototype. In an
 interview, qualify permission-aware retrieval as demonstrated ACL filtering with
@@ -46,7 +46,7 @@ Local checks on 17 October 2026:
 
 - `ruff check .`: passed.
 - `ruff format --check .`: passed.
-- `pytest -q`: 47 passed; two live-stack tests skipped by default.
+- `pytest -q`: 53 passed; two live-stack tests skipped by default.
 - `npm test`: 10 passed, including rendered client interaction tests.
 - `npm run build`: passed.
 - Synthetic PDF generation is deterministic and round-trips through the actual parser.
@@ -79,3 +79,20 @@ LLM factual/citation accuracy. No paid provider call was made during this review
 
 See [the demo guide](interview-demo.md) for the rehearsal steps and interview questions,
 and [the implementation map](architecture.md) for a more detailed code walkthrough.
+
+
+## Fresh-reviewer setup pass
+
+The README now begins with a complete Docker workflow, including fixture ingestion and
+expected search results. The explicit demo overlay builds the API and client, applies
+migrations, and uses a persistent model cache. Native Windows/POSIX instructions live
+in a separate guide; real-curriculum questions are kept separate from fictional course
+prerequisites. Native browser origins support both localhost and 127.0.0.1; Vite uses
+a strict port. Readiness checks the migrated schema and index rather than only process
+liveness, and the seed command diagnoses configuration errors before changing data.
+
+The `docker-demo` CI job follows the README commands from a clean checkout and then
+runs two Chromium checks against the actual containers: source/role behavior and a
+mobile layout. Its artifact includes screenshots, traces on failure, the check report,
+and service logs. The [PR checks](https://github.com/Aryamanjmwl/JKUAI/pull/2/checks)
+record the result for each revision. This still does not make a paid OpenAI call.

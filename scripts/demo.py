@@ -115,12 +115,19 @@ def check(client: httpx.Client, manifest: dict) -> dict:
         response.raise_for_status()
         result = response.json()
         ids = {source["document_id"] for source in result["sources"]}
-        if documents[expected] not in ids:
-            raise RuntimeError(f"Expected fixture missing for role {group or 'public'}: {expected}")
+        if not result["sources"] or result["sources"][0]["document_id"] != documents[expected]:
+            raise RuntimeError(f"Expected first result for role {group or 'public'}: {expected}")
         if group != "staff" and restricted in ids:
             raise RuntimeError("Restricted document leaked into public/student retrieval")
         checked.append(
-            {"question": query, "role": group or "public", "latency_ms": result["latency_ms"]}
+            {
+                "question": query,
+                "role": group or "public",
+                "top_source": result["sources"][0]["file_name"],
+                "page_number": result["sources"][0]["page_number"],
+                "excerpt": result["sources"][0]["excerpt"],
+                "latency_ms": result["latency_ms"],
+            }
         )
     for group in ("", "students", "admissions"):
         response = client.post(
@@ -148,9 +155,25 @@ def main():
     parser.add_argument("--output", type=Path, default=Path("data/demo-output"))
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-    with httpx.Client(base_url=args.url, timeout=180) as client:
-        manifest = seed(client, args.output)
-        report = check(client, manifest) if args.check else manifest
+    try:
+        with httpx.Client(base_url=args.url, timeout=300) as client:
+            ready = client.get("/ready")
+            ready.raise_for_status()
+            if args.check and not ready.json().get("demo_roles_enabled"):
+                parser.error(
+                    "Role checks require ENABLE_DEMO_ROLES=true in the API process. "
+                    "Restart the API with that setting, or use the Docker demo quickstart."
+                )
+            manifest = seed(client, args.output)
+            report = check(client, manifest) if args.check else manifest
+    except httpx.HTTPStatusError as exc:
+        parser.exit(1, f"API returned HTTP {exc.response.status_code}: {exc.response.text}\n")
+    except httpx.RequestError:
+        parser.exit(
+            1, f"Cannot reach the API at {args.url}. Start the services and check /ready.\n"
+        )
+    except RuntimeError as exc:
+        parser.exit(1, f"Demo check failed: {exc}\n")
     (args.output / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))
 

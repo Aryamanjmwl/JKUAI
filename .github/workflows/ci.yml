@@ -95,3 +95,41 @@ jobs:
             /tmp/jkuai-services.log
       - run: docker compose down
         if: always()
+
+  docker-demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Prepare OpenSearch host
+        run: sudo sysctl -w vm.max_map_count=262144
+      - name: Follow the README Docker quickstart
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d --build --wait --wait-timeout 180
+          docker compose -f docker-compose.yml -f docker-compose.demo.yml run --rm seed
+      - name: Verify same-origin API proxy
+        run: curl --fail http://localhost:5173/api/ready
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - run: npm run test:e2e
+        working-directory: frontend
+      - name: Collect demo logs
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.demo.yml logs --no-color > /tmp/jkuai-docker-demo.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: docker-demo-evidence
+          path: |
+            frontend/test-results/
+            data/demo-output/report.json
+            /tmp/jkuai-docker-demo.log
+      - run: docker compose -f docker-compose.yml -f docker-compose.demo.yml down
+        if: always()

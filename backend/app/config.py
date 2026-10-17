@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     rerank_k: int = Field(default=5, ge=1, le=200)
     max_upload_bytes: int = Field(default=10 * 1024 * 1024, ge=1)
     enable_demo_roles: bool = False
-    cors_origins: list[str] = ["http://localhost:5173"]
+    cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

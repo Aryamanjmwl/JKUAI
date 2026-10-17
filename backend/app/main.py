@@ -5,12 +5,16 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from opensearchpy.exceptions import OpenSearchException
 from pydantic import HttpUrl, TypeAdapter, ValidationError
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .auth import UserContext
 from .config import get_settings
 from .database import get_session
+from .models import Document
 from .schemas import IngestResponse, RetrievalResponse, SearchRequest, SearchResponse, Source
 from .security import get_user_context
 from .services.generation import (
@@ -21,7 +25,7 @@ from .services.generation import (
     generate_answer,
 )
 from .services.ingestion import DocumentConflictError, ingest_pdf
-from .services.opensearch import ensure_index_async
+from .services.opensearch import ensure_index_async, index_available_async
 from .services.search import hybrid_search
 
 
@@ -47,6 +51,18 @@ app.add_middleware(
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/ready")
+async def ready(session: Annotated[AsyncSession, Depends(get_session)]) -> dict:
+    try:
+        # Query a migrated table, not just SELECT 1: a reachable empty database is not ready.
+        await session.execute(select(Document.id).limit(1))
+        if not await index_available_async():
+            raise HTTPException(503, "The search index is not ready")
+    except (SQLAlchemyError, OpenSearchException, OSError) as exc:
+        raise HTTPException(503, "The database or search index is not ready") from exc
+    return {"status": "ready", "demo_roles_enabled": get_settings().enable_demo_roles}
 
 
 @app.post("/documents", response_model=IngestResponse)

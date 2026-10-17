@@ -3,73 +3,23 @@
 Use this guide to rehearse the local demo before the interview. Run the model downloads
 and PDF ingestion beforehand; the first inference is slower than a warm request.
 
-## Prepare the project on Windows
+## Start the local demo
 
-Use Python 3.11 or 3.12, Node 22.12+, PowerShell, and Docker Desktop. Keep Docker Desktop
-running. The commands below use a development branch; no changes to `main` are required.
+Follow the [README Docker quickstart](../README.md#try-it-locally). It runs the API,
+client, indexes, and model inference without installing host Python or Node. Complete
+the seed/check command before screen sharing and expect `"status": "passed"`.
 
-```powershell
-git clone https://github.com/Aryamanjmwl/JKUAI.git
-cd JKUAI
-git switch fix/retrieval-demo-readiness
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[cpu,dev]"
-Copy-Item .env.example .env
-```
+For native development, use [local-development.md](local-development.md). All reviewer
+setup commands target the default branch. The Docker demo explicitly enables simulated
+roles; the native API is public-only unless configured otherwise.
 
-For an existing checkout, commit or stash your own work before switching branches. Do
-not overwrite an existing `.env`; add any missing settings to it instead.
+The seed PDFs are fictional university examples and are visibly labelled. Open them
+from `data/demo-output/` while explaining page citations. To show actual university
+content, add the official curriculum using the README instructions and ask the written
+Master’s thesis credit question. Do not attribute the fictional course prerequisites
+to that curriculum.
 
-### Terminal 1: indexes and backend
-
-From the repository root with the virtual environment active:
-
-```powershell
-docker compose up -d --wait --wait-timeout 180
-alembic upgrade head
-python -c "from app.services.ml import embed_texts, rerank; embed_texts(['warmup']); rerank('warmup', [{'content':'warmup'}], 1)"
-$env:ENABLE_DEMO_ROLES="true"
-uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
-```
-
-The warmup downloads two local ML models. Keep the same user account and model cache
-for the interview. Do not clear the Docker volumes after ingestion.
-
-### Terminal 2: seed and check
-
-From the repository root, activate the same virtual environment:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-python scripts/demo.py --check
-```
-
-Expect `"status": "passed"`. This creates three small PDFs, a document-ID manifest,
-and a check report under `data/demo-output/`. Repeating the command exercises
-checksum deduplication. Both backend and frontend demo-role flags must be enabled for
-the role selector to match backend behavior.
-
-These documents are **fictional university examples**, visibly labelled in every PDF.
-They prove mechanics; they are not evidence about actual JKU regulations. The PDFs
-can be opened directly from `data/demo-output/` while discussing page citations.
-
-To demonstrate actual university content too, use the official PDF ingestion example
-in the README. The CI document smoke test asks how many ECTS points the written Master’s thesis
-is worth and checks the supporting passage on physical PDF page 7. Inspect that PDF
-first and ask a question it really answers. A curriculum
-does not necessarily define individual course prerequisites.
-
-### Terminal 3: frontend
-
-```powershell
-cd frontend
-npm ci
-$env:VITE_ENABLE_DEMO_ROLES="true"
-npm run dev -- --host 127.0.0.1
-```
-
-Open <http://localhost:5173>. Use **Search sources** first. It needs no OpenAI key.
+Open <http://localhost:5173> and use **Search sources** first; it needs no OpenAI key.
 
 ## A five-minute walkthrough
 
@@ -187,7 +137,7 @@ latency and failures. Start with these before adding more model complexity.
 | First search takes a long time | Complete the model warmup, then run one search before screen sharing. |
 | Search works but answers fail | Check the request key, provider billing/quota, network, and `OPENAI_MODEL` in `.env`. |
 | Upload returns 409 | The same PDF already exists with an incompatible ACL, or the current role cannot access it. Use the correct role and original ACL. |
-| No passages appear | Confirm the seed finished and `alembic upgrade head` succeeded. `/health` checks process liveness only. |
+| No passages appear | Confirm the seed finished and `alembic upgrade head` succeeded. `/health` checks process liveness; `/ready` checks the migrated database and index. |
 
 Stop the API and frontend with Ctrl+C. `docker compose stop` preserves the ingested
 corpus. `docker compose down -v` deletes it; avoid that before the interview.

@@ -81,3 +81,14 @@ distinct documents before applying the cutoff.
 
 See [security.md](security.md) for deployment requirements and
 [interview-demo.md](interview-demo.md) for reproducible examples.
+
+
+## Local deployment
+
+The base Compose file starts the two stores for native development. The explicit
+`docker-compose.demo.yml` overlay adds the API and Nginx-served React build, a persistent
+model cache, and a seed tool. The API container applies migrations before startup.
+Nginx proxies `/api` to the API over the Compose network, so the browser uses one origin.
+Both demo-role settings are enabled by this overlay; it is not a production profile.
+`/ready` queries a migrated table and checks that the lexical index exists; model
+inference is verified by the seed command rather than the liveness endpoint.
