@@ -13,11 +13,12 @@ export async function searchKnowledge(
   query: string,
   groups: string[],
   openaiApiKey: string,
+  mode: "answer" | "retrieval" = "answer",
 ): Promise<SearchResult> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "X-OpenAI-API-Key": openaiApiKey,
   };
+  if (mode === "answer") headers["X-OpenAI-API-Key"] = openaiApiKey;
   if (groups.length > 0) {
     headers["X-User-Id"] = "local-demo-user";
     headers["X-User-Groups"] = groups.join(",");
@@ -25,7 +26,7 @@ export async function searchKnowledge(
 
   let response: Response;
   try {
-    response = await fetch(`${API_URL}/search`, {
+    response = await fetch(`${API_URL}/search${mode === "retrieval" ? "/retrieval" : ""}`, {
       method: "POST",
       headers,
       body: JSON.stringify({ query }),
@@ -65,5 +66,6 @@ export async function searchKnowledge(
       response.status,
     );
   }
-  return response.json() as Promise<SearchResult>;
+  const result = await response.json() as SearchResult;
+  return { ...result, answer: result.answer ?? "Explore the ranked passages below. Choose Answer with citations to generate a response from these sources." };
 }

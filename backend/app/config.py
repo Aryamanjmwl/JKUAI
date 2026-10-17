@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,16 +9,24 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://jku:jku@localhost:5432/jku_search"
     opensearch_url: str = "http://localhost:9200"
     opensearch_index: str = "jku_chunks"
-    openai_model: str = "gpt-5.6"
+    openai_model: str = "gpt-4.1-mini"
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-    vector_dimension: int = 384
-    retrieve_k: int = 20
-    rerank_k: int = 5
+    # The initial database migration creates a vector(384) column.
+    vector_dimension: int = Field(default=384, ge=384, le=384)
+    retrieve_k: int = Field(default=20, ge=1, le=200)
+    rerank_k: int = Field(default=5, ge=1, le=200)
+    max_upload_bytes: int = Field(default=10 * 1024 * 1024, ge=1)
     enable_demo_roles: bool = False
-    cors_origins: list[str] = ["http://localhost:5173"]
+    cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @model_validator(mode="after")
+    def validate_ranking_limits(self):
+        if self.rerank_k > self.retrieve_k:
+            raise ValueError("rerank_k must not exceed retrieve_k")
+        return self
 
 
 @lru_cache

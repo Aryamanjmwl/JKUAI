@@ -1,0 +1,59 @@
+# Explicit local demo: simulated staff/student groups, no authentication.
+# Start with both this file and docker-compose.yml; do not deploy publicly.
+services:
+  api:
+    image: jkuai-api:local
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://jku:jku@postgres:5432/jku_search
+      OPENSEARCH_URL: http://opensearch:9200
+      ENABLE_DEMO_ROLES: "true"
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+    volumes:
+      - model_cache:/var/cache/huggingface
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready', timeout=5)"]
+      interval: 5s
+      timeout: 10s
+      start_period: 30s
+      retries: 30
+
+  web:
+    image: jkuai-web:local
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /api
+        VITE_ENABLE_DEMO_ROLES: "true"
+    ports:
+      - "127.0.0.1:5173:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  seed:
+    image: jkuai-api:local
+    profiles: [tools]
+    command: ["python", "scripts/demo.py", "--url", "http://api:8000", "--check"]
+    volumes:
+      - ./data/demo-output:/app/data/demo-output
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  model_cache:

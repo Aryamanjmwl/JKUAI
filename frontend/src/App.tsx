@@ -28,6 +28,7 @@ function AnswerText({ answer, sources }: { answer: string; sources: Source[] }) 
 }
 
 export default function App() {
+  const [mode, setMode] = useState<"retrieval" | "answer">("retrieval");
   const [apiKey, setApiKey] = useState("");
   const [draftApiKey, setDraftApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
@@ -39,14 +40,14 @@ export default function App() {
 
   async function runSearch(question: string) {
     const cleanQuestion = question.trim();
-    if (cleanQuestion.length < 3 || !apiKey || loading) return;
+    if (cleanQuestion.length < 3 || (mode === "answer" && !apiKey) || loading) return;
 
     setQuery(cleanQuestion);
     setLoading(true);
     setError("");
     setResult(null);
     try {
-      setResult(await searchKnowledge(cleanQuestion, group ? [group] : [], apiKey));
+      setResult(await searchKnowledge(cleanQuestion, group ? [group] : [], apiKey, mode));
     } catch (reason) {
       if (reason instanceof SearchError && reason.status === 401) {
         setApiKey("");
@@ -103,7 +104,7 @@ export default function App() {
             <div className="key-status" role="status">
               <span aria-hidden="true" />
               <span>OpenAI ready</span>
-              <button onClick={disconnectOpenAI} type="button">Disconnect</button>
+              <button disabled={loading} onClick={disconnectOpenAI} type="button">Disconnect</button>
             </div>
           )}
         </div>
@@ -117,7 +118,7 @@ export default function App() {
               <span>Roles are simulated for testing only. This is not a real sign-in.</span>
             </div>
             <label htmlFor="demo-role">Simulated role</label>
-            <select id="demo-role" value={group} onChange={(event) => setGroup(event.target.value)}>
+            <select id="demo-role" value={group} disabled={loading} onChange={(event) => { setGroup(event.target.value); setResult(null); setError(""); }}>
               <option value="">Public visitor</option>
               <option value="students">Student</option>
               <option value="staff">Staff member</option>
@@ -131,10 +132,14 @@ export default function App() {
           <h1 id="page-title">What would you like to know?</h1>
           <p className="intro">
             Ask about courses, prerequisites, exams, deadlines, or university regulations.
-            Every answer shows the documents it came from.
+            Search source passages directly, or generate an answer with citations.
           </p>
 
-          {!apiKey && (
+          <div className="search-modes" role="group" aria-label="Search mode">
+            <button type="button" disabled={loading} aria-pressed={mode === "retrieval"} onClick={() => { setMode("retrieval"); setResult(null); setError(""); }}>Search sources</button>
+            <button type="button" disabled={loading} aria-pressed={mode === "answer"} onClick={() => { setMode("answer"); setResult(null); setError(""); }}>Answer with citations</button>
+          </div>
+          {mode === "answer" && !apiKey && (
             <section className="connection-card" aria-labelledby="connection-title">
               <div className="connection-copy">
                 <span className="shield-icon" aria-hidden="true">✓</span>
@@ -196,7 +201,7 @@ export default function App() {
             </section>
           )}
 
-          {apiKey && <form className="search-form" onSubmit={submit}>
+          {(mode === "retrieval" || apiKey) && <form className="search-form" onSubmit={submit}>
             <label className="sr-only" htmlFor="question">Your question</label>
             <div className="question-box">
               <textarea
@@ -214,13 +219,13 @@ export default function App() {
                 aria-describedby="question-help"
               />
               <button disabled={loading || query.trim().length < 3} type="submit">
-                {loading ? "Searching…" : "Ask JKUAI"}
+                {loading ? "Searching…" : mode === "retrieval" ? "Search sources" : "Ask JKUAI"}
               </button>
             </div>
             <p id="question-help" className="question-help">Press Enter to search · Shift + Enter for a new line</p>
           </form>}
 
-          {apiKey && <div className="examples" aria-label="Example questions">
+          {(mode === "retrieval" || apiKey) && <div className="examples" aria-label="Example questions">
             <span>Try an example</span>
             <div className="example-list">
               {EXAMPLE_QUESTIONS.map((example) => (
@@ -249,19 +254,19 @@ export default function App() {
               <p>{error}</p>
             </div>
             <button
-              onClick={() => apiKey ? void runSearch(query) : setError("")}
+              onClick={() => (mode === "retrieval" || apiKey) ? void runSearch(query) : setError("")}
               type="button"
             >
-              {apiKey ? "Try again" : "Enter another key"}
+              {(mode === "retrieval" || apiKey) ? "Try again" : "Enter another key"}
             </button>
           </section>
         )}
 
-        {apiKey && !loading && !error && !result && (
+        {(mode === "retrieval" || apiKey) && !loading && !error && !result && (
           <section className="how-it-works" aria-label="How search works">
             <div><span>1</span><p><strong>Ask naturally</strong>Use the same words you would use when asking a study advisor.</p></div>
-            <div><span>2</span><p><strong>Read the answer</strong>JKUAI combines information found in relevant documents.</p></div>
-            <div><span>3</span><p><strong>Check the sources</strong>Open the exact documents and pages used for the answer.</p></div>
+            <div><span>2</span><p><strong>Review the results</strong>Inspect ranked passages or generate an answer with citations.</p></div>
+            <div><span>3</span><p><strong>Check the sources</strong>Read source passages and open linked documents to verify important details.</p></div>
           </section>
         )}
 
@@ -270,8 +275,8 @@ export default function App() {
             <article className="answer-panel">
               <div className="panel-heading">
                 <div>
-                  <p className="section-label">ANSWER</p>
-                  <h2>{sourceCount > 0 ? "Based on JKU documents" : "No verified answer found"}</h2>
+                  <p className="section-label">{mode === "retrieval" ? "RETRIEVAL RESULTS" : "ANSWER"}</p>
+                  <h2>{sourceCount > 0 ? (mode === "retrieval" ? "Ranked source passages" : "Based on retrieved documents") : "No matching source found"}</h2>
                 </div>
                 <span className="source-count">{sourceCount} {sourceCount === 1 ? "source" : "sources"}</span>
               </div>
@@ -280,7 +285,7 @@ export default function App() {
                 <AnswerText answer={result.answer} sources={result.sources} />
               </p>
 
-              {sourceCount > 0 && (
+              {mode === "answer" && sourceCount > 0 && (
                 <div className="verification-note">
                   <span aria-hidden="true">✓</span>
                   <p><strong>Easy to verify</strong>Select a citation in the answer or open a source document to check the information.</p>
@@ -289,7 +294,7 @@ export default function App() {
 
               {result.exact_documents_used.length > 0 && (
                 <details className="documents-used">
-                  <summary>Documents used in this answer ({result.exact_documents_used.length})</summary>
+                  <summary>{mode === "retrieval" ? "Retrieved documents" : "Documents cited in this answer"} ({result.exact_documents_used.length})</summary>
                   <ul>
                     {result.exact_documents_used.map((name) => <li key={name}>{name}</li>)}
                   </ul>
@@ -301,7 +306,7 @@ export default function App() {
               <div className="sources-heading">
                 <div>
                   <p className="section-label">SOURCES</p>
-                  <h2>Where this answer came from</h2>
+                  <h2>{mode === "retrieval" ? "Sources to inspect" : "Passages supplied to the model"}</h2>
                 </div>
                 <span>{Math.round(result.latency_ms) / 1000}s</span>
               </div>
@@ -323,7 +328,7 @@ export default function App() {
                       <p>{source.excerpt}</p>
                       {source.source_url && (
                         <a href={source.source_url} target="_blank" rel="noreferrer">
-                          Open official document <span aria-hidden="true">↗</span>
+                          Open source document <span aria-hidden="true">↗</span>
                         </a>
                       )}
                     </article>
@@ -336,7 +341,7 @@ export default function App() {
       </main>
 
       <footer>
-        <p>JKUAI may make mistakes. Confirm important requirements in the linked official documents.</p>
+        <p>JKUAI may make mistakes. Confirm important requirements against the original documents.</p>
       </footer>
     </div>
   );

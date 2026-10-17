@@ -8,4 +8,6 @@ class UserContext:
 
 
 def can_access(visibility: str, allowed_groups: list[str], user: UserContext) -> bool:
-    return visibility == "public" or bool(set(allowed_groups).intersection(user.groups))
+    return visibility == "public" or (
+        visibility == "restricted" and bool(set(allowed_groups).intersection(user.groups))
+    )

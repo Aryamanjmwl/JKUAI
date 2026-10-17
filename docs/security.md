@@ -9,7 +9,8 @@ the boundaries they rely on, and the work required before exposing the service t
 The default application treats every caller as anonymous. It searches only documents
 whose visibility is `public`; caller-supplied user and group headers are ignored.
 Permission filters are applied independently in PostgreSQL and OpenSearch before result
-fusion, reranking, and answer generation.
+fusion, reranking, and answer generation. Lexical hits are reauthorized against
+PostgreSQL during hydration, so stale lexical grants cannot supply restricted text.
 
 Setting `ENABLE_DEMO_ROLES=true` changes this boundary. The API then accepts
 `X-User-Id` and `X-User-Groups` as simulated identity data so permission behaviour can
@@ -22,9 +23,9 @@ must remain disabled anywhere that is reachable by untrusted users.
 |---|---|---|
 | Search | Anonymous callers are restricted to public documents | No user authentication, abuse controls, or request quotas |
 | Restricted documents | ACL filtering occurs in both retrieval engines | Group membership is simulated in developer mode; no identity provider or ACL synchronization |
-| Document ingestion | File type and visibility values are validated | `POST /documents` is unauthenticated and intended only for local use |
+| Document ingestion | File type, size, title, source URL, and visibility are validated | `POST /documents` is unauthenticated and intended only for local use |
 | OpenAI credential | Accepted per request and not intentionally persisted by the application | A browser-supplied key passes through the API process and any surrounding infrastructure |
-| Generated answers | The model is instructed to use retrieved sources and emit source markers | Prompt injection and citation correctness are not yet automatically evaluated |
+| Generated answers | The model is instructed to use retrieved sources; missing and unknown citation IDs are rejected | Prompt injection and citation correctness are not yet automatically evaluated |
 | Local infrastructure | Docker services are convenient and reproducible | Default database credentials and disabled OpenSearch security are unsuitable for deployment |
 | Data at rest | Documents and chunks remain in local Docker volumes | Encryption, backup policy, retention, and secure deletion are not configured |
 

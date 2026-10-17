@@ -13,3 +13,9 @@ def test_chunking_preserves_page_number_and_overlap():
 def test_overlap_must_be_smaller_than_chunk_size():
     with pytest.raises(ValueError):
         chunk_pages([TextPage(1, "content")], chunk_size=100, overlap=100)
+
+
+@pytest.mark.parametrize("size,overlap", [(0, 0), (-1, 0), (100, -1)])
+def test_invalid_chunk_dimensions_are_rejected(size, overlap):
+    with pytest.raises(ValueError):
+        chunk_pages([TextPage(1, "text")], chunk_size=size, overlap=overlap)

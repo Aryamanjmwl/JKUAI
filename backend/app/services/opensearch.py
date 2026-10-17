@@ -57,3 +57,12 @@ async def index_chunks_async(payloads: list[dict]) -> None:
 async def search_async(body: dict) -> dict:
     settings = get_settings()
     return await asyncio.to_thread(client().search, index=settings.opensearch_index, body=body)
+
+
+def index_available() -> bool:
+    with client() as search:
+        return bool(search.indices.exists(index=get_settings().opensearch_index))
+
+
+async def index_available_async() -> bool:
+    return await asyncio.to_thread(index_available)

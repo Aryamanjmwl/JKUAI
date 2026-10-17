@@ -1,245 +1,166 @@
-# JKUAI — University Knowledge Search
+# JKUAI — Permission-Aware University Search
 
 [![CI](https://github.com/Aryamanjmwl/JKUAI/actions/workflows/ci.yml/badge.svg)](https://github.com/Aryamanjmwl/JKUAI/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-1d6747.svg)](LICENSE)
 
-JKUAI is a compact enterprise-search and retrieval-augmented generation system for university documents. It combines lexical and semantic retrieval, cross-encoder reranking, access-aware filtering, and source-linked answers.
+JKUAI searches university PDFs using BM25, vector embeddings, and cross-encoder
+reranking. It can generate answers from retrieved passages with inline citations,
+physical PDF page numbers, filenames, and source links when supplied.
 
-The project is designed to answer questions such as:
+Permission filters run before passages reach the reranker or answer generator.
+PostgreSQL is the authority for access decisions, including when OpenSearch contains
+an outdated grant. This is an independent portfolio prototype, not an official JKU service.
 
-> Which courses should I complete before taking Advanced Machine Learning?
+## Try it locally
 
-Every answer is grounded in retrieved document passages and returned with citations, page numbers, source links, and the exact filenames used.
+The complete demo runs in Docker: PostgreSQL/pgvector, OpenSearch, FastAPI, and the React
+client. You do not need host Python, Node.js, downloaded PDFs, or an OpenAI key for
+source search.
 
-> [!NOTE]
-> JKUAI is an independent portfolio project. It is not an official service of Johannes Kepler University Linz.
+**Requirements:** Git, Docker with Compose v2.20+, and a running Docker engine. On
+Windows use Docker Desktop with Linux containers. Allow about 6 GB RAM and 10 GB free
+disk space. The first build downloads Python packages and CPU inference dependencies;
+the first seed downloads two ML models. Subsequent runs reuse image layers and a model
+cache. The automated verification uses Linux x86-64 containers.
 
-## Why this project
+On Linux, OpenSearch requires `vm.max_map_count` of at least 262144. Check
+`cat /proc/sys/vm/max_map_count`; if lower, run `sudo sysctl -w vm.max_map_count=262144`
+before starting the services. Docker Desktop manages the Linux VM separately.
 
-Enterprise search has requirements that a general chatbot does not address:
+Clone the repository, then run these commands **from its root directory**. They work in
+PowerShell and POSIX shells:
 
-- exact terms and course identifiers must remain searchable;
-- semantically similar wording must still retrieve the right passages;
-- restricted content must be filtered before ranking and generation;
-- answers must be traceable to authoritative documents; and
-- retrieval quality must be measured independently from answer generation.
+```sh
+git clone https://github.com/Aryamanjmwl/JKUAI.git
+cd JKUAI
+docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d --build --wait --wait-timeout 180
+docker compose -f docker-compose.yml -f docker-compose.demo.yml run --rm seed
+```
 
-JKUAI implements these concerns as separate, testable stages rather than hiding them behind a single LLM call.
+The seed command must finish with `"status": "passed"`. It uploads three **clearly
+labelled fictional university PDFs**, checks their ranking and role isolation, and
+writes the PDFs and check report to `data/demo-output/`. These examples demonstrate the
+pipeline; they are not actual university regulations. Repeating the seed is safe and
+checks deduplication.
 
-## System overview
+Open **<http://localhost:5173>**. Select **Search sources** and try:
+
+| Role | Question | Expected result |
+|---|---|---|
+| Public visitor | What do I need before taking Advanced Machine Learning? | Course Guide ranks first; its excerpt names Introduction to Machine Learning and Linear Algebra. |
+| Public visitor | What happens if I miss an exam because of illness? | Exam Regulations ranks first; the excerpt explains notification and a medical certificate. |
+| Public visitor | What is the EXAM-OPS-42 internal routing code? | No Staff Operations passage or ORCHID-742 appears. Unrelated public passages can still appear. |
+| Staff member | What is the EXAM-OPS-42 internal routing code? | Staff Operations ranks first and includes ORCHID-742. |
+
+The Docker demo explicitly enables **simulated roles** in both services. They are not
+login identities. Services bind to localhost; keep this configuration local.
+
+### Generate an answer
+
+Switch to **Answer with citations**, enter a working OpenAI API key, and ask the course
+prerequisite question. This is the only step requiring a paid provider account and
+network access to OpenAI. The default model is `gpt-4.1-mini`; set `OPENAI_MODEL` in an
+optional root `.env` and recreate the API to change it.
+
+The key stays in browser-tab memory and is forwarded with answer requests. The backend
+sends the question and accessible passages to OpenAI. Do not enter a key into an
+untrusted hosted copy. Click an inline citation to inspect its passage. Missing or
+unknown citation IDs trigger an insufficient-evidence response; valid IDs alone do
+not prove factual support.
+
+## Try a real university PDF
+
+The fictional prerequisites above are not claimed to exist in this official curriculum.
+For a real-document example, download the JKU Computer Science Master's curriculum
+using [the native setup guide](docs/local-development.md#add-an-official-document),
+or use the interactive API at <http://localhost:8000/docs>:
+
+1. Download <https://studienhandbuch.jku.at/texte/1170_7_MS_ComputerScience.pdf>.
+2. Use `POST /documents`: select the PDF, set a title and its source URL, and use `public`
+   visibility. Uploads support text PDFs up to 10 MiB; OCR and encrypted PDFs are unsupported.
+3. Ask: **How many ECTS points is the written Master's thesis in Computer Science worth?**
+
+The document smoke test checks a supporting passage on physical PDF page 7, along with
+its filename, source URL, and citation ID. This is checked against the downloaded
+curriculum version; inspect the PDF if the university replaces it. The original PDF
+bytes are not retained by the API: keep your copy or provide a source URL.
+
+## How it works
 
 ```mermaid
 flowchart TD
-    D["PDF upload"] --> P["Parse, normalize, and chunk"]
-    P --> E["Local sentence-transformer embeddings"]
-    E --> PG[("PostgreSQL + pgvector")]
-    P --> OS[("OpenSearch BM25")]
-    Q["User question"] --> H["Permission-aware hybrid retrieval"]
-    PG --> H
-    OS --> H
-    H --> R["Reciprocal Rank Fusion + cross-encoder reranking"]
-    R --> G["Grounded answer generation"]
-    G --> O["Answer + citations + exact documents"]
+    PDF["PDF pages"] --> Chunk["Text chunks and embeddings"]
+    Chunk --> PG[("PostgreSQL / pgvector")]
+    Chunk --> OS[("OpenSearch / BM25")]
+    Q["Question and permitted groups"] --> Retrieve["Filtered vector and lexical retrieval"]
+    PG --> Retrieve
+    OS --> Retrieve
+    Retrieve --> RRF["Reciprocal Rank Fusion"]
+    RRF --> Rank["Cross-encoder reranking"]
+    Rank --> Sources["Ranked passages with page metadata"]
+    Sources --> Answer["Optional answer with citations"]
 ```
 
-Access filters are applied inside both retrieval paths before fusion and reranking. The system retrieves up to 20 candidates from each index, fuses the rankings with Reciprocal Rank Fusion, and reranks the merged candidates to the best five passages.
+Each retriever supplies up to 20 candidates. RRF merges by chunk ID using
+`1 / (60 + rank)` contributions. The best 20 fused candidates are reranked to at most
+five passages. Lexical hits are reauthorized against PostgreSQL while their text is
+loaded, blocking stale lexical grants. Scores are relevance rankings, not probabilities.
 
-## Implemented capabilities
-
-| Capability | Implementation | Status |
-|---|---|---|
-| PDF ingestion | Page-aware parsing, normalized text, overlapping chunks | Implemented |
-| Duplicate detection | SHA-256 document checksum | Implemented |
-| Semantic retrieval | 384-dimensional sentence-transformer embeddings in pgvector | Implemented |
-| Lexical retrieval | BM25 over titles and chunk content in OpenSearch | Implemented |
-| Hybrid ranking | Reciprocal Rank Fusion followed by cross-encoder reranking | Implemented |
-| Grounded answers | OpenAI Responses API with inline source markers | Local demo |
-| Source verification | Excerpts, page numbers, document links, and exact filenames | Implemented |
-| Access filtering | Public-only by default; simulated groups behind an explicit developer flag | Implemented for demonstration |
-| Retrieval evaluation | Recall@5, MRR, mean latency, and p95 latency | Runner implemented; benchmark pending |
-
-## Technology stack
-
-| Layer | Technology |
+| Layer | Implementation |
 |---|---|
-| API | Python 3.11+, FastAPI, Pydantic |
-| Relational/vector store | PostgreSQL 16, pgvector, SQLAlchemy, Alembic |
-| Lexical search | OpenSearch 2.19 |
-| Embeddings | `sentence-transformers/all-MiniLM-L6-v2` |
-| Reranker | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
-| Answer generation | OpenAI Responses API |
-| Web client | React, TypeScript, Vite |
-| Local infrastructure | Docker Compose |
-| Quality checks | pytest, Ruff, GitHub Actions |
+| API | Python 3.11–3.13, FastAPI, Pydantic, SQLAlchemy, Alembic |
+| Storage | PostgreSQL 16 and 384-dimensional pgvector embeddings |
+| Lexical search | OpenSearch 2.19 BM25 over titles and passage text |
+| Local ML | `all-MiniLM-L6-v2` bi-encoder and `ms-marco-MiniLM-L-6-v2` cross-encoder |
+| Generation | OpenAI Responses API; request-scoped key and bounded output |
+| Client | React, TypeScript, Vite; Nginx serves the Docker build and proxies `/api` |
+| Infrastructure | Docker Compose, persistent database/index/model volumes |
 
-## Run locally on Windows
+## API and verification
 
-### Prerequisites
+- Interactive API: <http://localhost:8000/docs>.
+- `GET /health`: process liveness.
+- `GET /ready`: migrated database and lexical index readiness; does not run model inference.
+- `POST /search/retrieval`: sources without OpenAI usage.
+- `POST /search`: generated answer, retrieved passages, cited filenames, and latency.
 
-- Python 3.11 or 3.12
-- Docker Desktop
-- Node.js 22
-- Git and PowerShell 7
+CI runs backend/API tests, client tests and build, real-store integration tests, and the
+same Docker quickstart shown above. Chromium tests use the actual served UI and API to
+check source search, role isolation, answer-mode setup, and a mobile viewport. Artifacts
+include screenshots and service logs. Paid OpenAI answer quality is not tested in CI.
 
-### 1. Prepare the backend
+For native development, test commands, and document upload examples, see
+[local development](docs/local-development.md). The retrieval evaluator reports
+Recall@5, MRR@5, and latency from a supplied labelled question set; no representative
+quality benchmark has been published.
 
-```powershell
-git clone https://github.com/Aryamanjmwl/JKUAI.git
-cd JKUAI
+## Stop or troubleshoot
 
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -e ".[cpu,dev]"
-Copy-Item .env.example .env
+```sh
+docker compose -f docker-compose.yml -f docker-compose.demo.yml ps
+docker compose -f docker-compose.yml -f docker-compose.demo.yml logs --tail 100 api opensearch
+docker compose -f docker-compose.yml -f docker-compose.demo.yml stop
 ```
 
-### 2. Start the indexes and API
+Stopping preserves documents and cached models. Do not add `-v` to `down` unless you
+intend to delete the database, index, and model cache. Ports 5173, 8000, 5432, and 9200
+must be free. If setup fails, inspect the service logs above; a seed error explains
+whether the API is unreachable, not ready, or missing demo-role configuration.
 
-```powershell
-docker compose up -d
-docker compose ps
-alembic upgrade head
-uvicorn app.main:app --app-dir backend --reload
-```
+## Scope and tradeoffs
 
-The API is available at <http://localhost:8000>; interactive documentation is available at <http://localhost:8000/docs>.
+- Default native API settings are public-only and ignore identity headers. The separate
+  Docker demo enables role simulation. Verified authentication and administrative
+  authorization for ingestion remain future work.
+- Ingestion writes synchronously to two stores without a shared transaction. An outbox
+  and retryable worker are needed for robust production indexing.
+- Citation-ID validation checks syntax, not whether every claim follows from a passage.
+  There is no calibrated relevance threshold or evaluated prompt-injection guarantee.
+- HNSW exists in the migration; query plans and large-corpus recall/performance need measurement.
 
-### 3. Start the web client
-
-Open a second PowerShell terminal:
-
-```powershell
-cd .\frontend
-npm ci
-npm run dev
-```
-
-Open <http://localhost:5173>.
-
-## Add a document
-
-Downloaded documents are intentionally excluded from Git. The following example downloads the official JKU Master's Curriculum in Computer Science and submits it through `POST /documents`:
-
-```powershell
-New-Item -ItemType Directory -Force -Path data\raw | Out-Null
-Invoke-WebRequest `
-  -Uri "https://studienhandbuch.jku.at/texte/1170_7_MS_ComputerScience.pdf" `
-  -OutFile "data\raw\jku-ms-computer-science-curriculum.pdf"
-
-curl.exe -X POST http://localhost:8000/documents `
-  -F "file=@data/raw/jku-ms-computer-science-curriculum.pdf;type=application/pdf" `
-  -F "title=JKU Master's Curriculum in Computer Science" `
-  -F "source_url=https://studienhandbuch.jku.at/texte/1170_7_MS_ComputerScience.pdf" `
-  -F "visibility=public"
-```
-
-The ingestion response reports the document ID, number of chunks created, and whether the PDF was already indexed.
-
-## Ask a question
-
-The local web client requests a user-provided OpenAI API key before generating an answer. The key is held in browser memory for the current tab and forwarded to the backend with each question; it is not written to application storage.
-
-This bring-your-own-key flow is intended for local evaluation only. Do not enter an API key into an untrusted or publicly hosted copy of JKUAI. A production deployment should keep provider credentials in server-side secret storage and protect usage with authentication, rate limits, and spending controls.
-
-API example:
-
-```powershell
-curl.exe -X POST http://localhost:8000/search `
-  -H "Content-Type: application/json" `
-  -H "X-OpenAI-API-Key: YOUR_OPENAI_API_KEY" `
-  -d '{"query":"Which courses are required before Advanced Machine Learning?"}'
-```
-
-The response includes the generated answer, the five reranked sources, exact document filenames, and end-to-end latency.
-
-## Permission model
-
-JKUAI starts in public-only mode. Caller-supplied identity headers are ignored, so changing a browser request cannot grant access to restricted documents.
-
-For local demonstrations, simulated roles can be enabled explicitly:
-
-```powershell
-# Backend terminal
-$env:ENABLE_DEMO_ROLES="true"
-uvicorn app.main:app --app-dir backend --reload
-
-# Frontend terminal
-$env:VITE_ENABLE_DEMO_ROLES="true"
-npm run dev
-```
-
-The interface then displays a developer-mode warning and a simulated role selector. This is not authentication and must remain disabled in a public deployment. Production access control requires verified identities and server-assigned group claims.
-
-## Evaluate retrieval
-
-Retrieval metrics use `POST /search/retrieval`, which bypasses answer generation and does not consume OpenAI tokens.
-
-Copy the example dataset and replace each placeholder with an indexed document UUID:
-
-```powershell
-Copy-Item evaluation/questions.example.jsonl evaluation/questions.jsonl
-python evaluation/evaluate.py evaluation/questions.jsonl
-```
-
-The evaluator reports:
-
-- Recall@5
-- Mean Reciprocal Rank
-- mean retrieval latency
-- p95 retrieval latency
-
-No benchmark score is published yet because the repository does not contain a completed, reviewed question set.
-
-## Repository layout
-
-```text
-backend/app/          FastAPI routes, retrieval, ingestion, and generation
-frontend/src/         React search interface
-migrations/           Versioned PostgreSQL schema
-evaluation/           Retrieval evaluation runner and dataset format
-tests/                Unit tests for chunking, ranking, credentials, and permissions
-docs/adr/             Architecture decision records
-.github/workflows/    Continuous integration
-```
-
-## Engineering decisions
-
-- [Security and trust boundaries](docs/security.md)
-- [ADR 0001: Separate lexical and vector indexes](docs/adr/0001-hybrid-retrieval.md)
-- [ADR 0002: Filter permissions during retrieval](docs/adr/0002-permission-filtering.md)
-
-The first version performs synchronous writes to PostgreSQL and OpenSearch. A production ingestion service should use an outbox-backed worker to make indexing retryable and observable.
-
-## Known limitations
-
-- PDF extraction does not perform OCR on scanned pages.
-- Real user authentication and identity-provider integration are not implemented.
-- Developer role simulation is not a production authorization mechanism.
-- The local API-key flow is not intended for a public multi-user deployment.
-- The repository provides an evaluation runner, but not a completed 50-question benchmark.
-- Index writes are synchronous and do not yet use an outbox or background worker.
-
-## Quality checks
-
-```powershell
-ruff check .
-ruff format --check .
-pytest -q
-
-cd frontend
-npm ci
-npm run build
-```
-
-GitHub Actions runs the backend and frontend checks on every push to `main` and on pull requests.
-
-## Roadmap
-
-1. Add verified authentication and server-side group mapping.
-2. Move ingestion to an outbox-backed indexing worker.
-3. Publish a reviewed 50-question benchmark with citation-correctness scoring.
+See [architecture](docs/architecture.md), [security](docs/security.md),
+[verification evidence](docs/review.md), and the [demo walkthrough](docs/interview-demo.md).
 
 ## License
 
-This project is released under the [MIT License](LICENSE).
+[MIT](LICENSE).

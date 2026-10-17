@@ -8,9 +8,17 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
-    runs-on: ubuntu-latest
+    name: Backend (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -36,4 +44,100 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - run: npm test
       - run: npm run build
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ENABLE_DEMO_ROLES: "true"
+      RUN_INTEGRATION: "1"
+      OFFICIAL_PDF: /tmp/jkuai-curriculum.pdf
+      TOKENIZERS_PARALLELISM: "false"
+      OMP_NUM_THREADS: "2"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: retrieval-models-minilm-v1
+      - run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - run: pip install -e ".[cpu,dev]"
+      - name: Start PostgreSQL and OpenSearch
+        run: |
+          sudo sysctl -w vm.max_map_count=262144
+          docker compose up -d --wait --wait-timeout 180
+      - run: alembic upgrade head
+      - name: Warm local models
+        run: python -c "from app.services.ml import embed_texts, rerank; embed_texts(['warmup']); rerank('warmup', [{'content':'warmup'}], 1)"
+      - name: Start API
+        run: |
+          uvicorn app.main:app --app-dir backend > /tmp/jkuai-api.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            curl -fs http://localhost:8000/health && exit 0
+            sleep 1
+          done
+          cat /tmp/jkuai-api.log
+          exit 1
+      - run: python scripts/demo.py --check
+      - name: Download official curriculum for the document smoke test
+        run: curl --fail --location --retry 2 --max-time 60 https://studienhandbuch.jku.at/texte/1170_7_MS_ComputerScience.pdf -o /tmp/jkuai-curriculum.pdf
+      - run: pytest -q tests/integration
+      - name: Capture service logs
+        if: always()
+        run: |
+          docker compose logs --no-color > /tmp/jkuai-services.log
+          cat /tmp/jkuai-api.log || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-evidence
+          path: |
+            data/demo-output/report.json
+            /tmp/jkuai-api.log
+            /tmp/jkuai-services.log
+      - run: docker compose down
+        if: always()
+
+  docker-demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Prepare OpenSearch host
+        run: sudo sysctl -w vm.max_map_count=262144
+      - name: Follow the README Docker quickstart
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d --build --wait --wait-timeout 180
+          docker compose -f docker-compose.yml -f docker-compose.demo.yml run --rm seed
+      - name: Verify same-origin API proxy
+        run: curl --fail http://localhost:5173/api/ready
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - run: npm run test:e2e
+        working-directory: frontend
+      - name: Collect demo logs
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.demo.yml logs --no-color > /tmp/jkuai-docker-demo.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: docker-demo-evidence
+          path: |
+            frontend/test-results/
+            data/demo-output/report.json
+            /tmp/jkuai-docker-demo.log
+      - run: docker compose -f docker-compose.yml -f docker-compose.demo.yml down
+        if: always()
