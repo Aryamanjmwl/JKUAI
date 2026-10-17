@@ -16,6 +16,7 @@ python -m pip install -e ".[cpu,dev]"
 Copy-Item .env.example .env
 ```
 
+If you installed Python 3.12, use `py -3.12` in the environment-creation command.
 Copy the example only for a new checkout; preserve an existing `.env`. If PowerShell
 blocks activation, use `.\.venv\Scripts\python.exe` explicitly instead. The remaining
 commands assume activation succeeded.

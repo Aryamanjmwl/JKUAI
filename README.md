@@ -23,6 +23,10 @@ disk space. The first build downloads Python packages and CPU inference dependen
 the first seed downloads two ML models. Subsequent runs reuse image layers and a model
 cache. The automated verification uses Linux x86-64 containers.
 
+On Linux, OpenSearch requires `vm.max_map_count` of at least 262144. Check
+`cat /proc/sys/vm/max_map_count`; if lower, run `sudo sysctl -w vm.max_map_count=262144`
+before starting the services. Docker Desktop manages the Linux VM separately.
+
 Clone the repository, then run these commands **from its root directory**. They work in
 PowerShell and POSIX shells:
 
@@ -32,10 +36,6 @@ cd JKUAI
 docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d --build --wait --wait-timeout 180
 docker compose -f docker-compose.yml -f docker-compose.demo.yml run --rm seed
 ```
-
-On Linux, OpenSearch requires `vm.max_map_count` of at least 262144. Check
-`cat /proc/sys/vm/max_map_count`; if lower, run `sudo sysctl -w vm.max_map_count=262144`
-before starting the services. Docker Desktop manages the Linux VM separately.
 
 The seed command must finish with `"status": "passed"`. It uploads three **clearly
 labelled fictional university PDFs**, checks their ranking and role isolation, and
