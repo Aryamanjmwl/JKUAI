@@ -2,6 +2,7 @@ import { type FormEvent, useState } from "react";
 
 import { SearchError, searchKnowledge } from "./api";
 import type { SearchResult, Source } from "./types";
+import DocumentUpload from "./DocumentUpload";
 
 const EXAMPLE_QUESTIONS = [
   "What do I need before taking Advanced Machine Learning?",
@@ -28,6 +29,8 @@ function AnswerText({ answer, sources }: { answer: string; sources: Source[] }) 
 }
 
 export default function App() {
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [mode, setMode] = useState<"retrieval" | "answer">("retrieval");
   const [apiKey, setApiKey] = useState("");
   const [draftApiKey, setDraftApiKey] = useState("");
@@ -100,6 +103,9 @@ export default function App() {
         </a>
 
         <div className="topbar-actions">
+          <button className="upload-toggle" type="button" aria-expanded={uploadOpen} aria-controls="document-upload" disabled={uploading} onClick={() => setUploadOpen((open) => !open)}>
+            {uploadOpen ? "Close upload" : "Add PDF"}
+          </button>
           {apiKey && (
             <div className="key-status" role="status">
               <span aria-hidden="true" />
@@ -118,7 +124,7 @@ export default function App() {
               <span>Roles are simulated for testing only. This is not a real sign-in.</span>
             </div>
             <label htmlFor="demo-role">Simulated role</label>
-            <select id="demo-role" value={group} disabled={loading} onChange={(event) => { setGroup(event.target.value); setResult(null); setError(""); }}>
+            <select id="demo-role" value={group} disabled={loading || uploading} onChange={(event) => { setGroup(event.target.value); setResult(null); setError(""); }}>
               <option value="">Public visitor</option>
               <option value="students">Student</option>
               <option value="staff">Staff member</option>
@@ -126,6 +132,13 @@ export default function App() {
             </select>
           </aside>
         )}
+
+        {uploadOpen && <DocumentUpload
+          groups={group ? [group] : []}
+          demoRolesEnabled={DEMO_ROLES_ENABLED}
+          onBusyChange={setUploading}
+          onUploaded={() => { setResult(null); setError(""); }}
+        />}
 
         <section className="search-section" aria-labelledby="page-title">
           <p className="section-label">JKU STUDY INFORMATION</p>

@@ -32,3 +32,25 @@ describe("search API", () => {
     await expect(searchKnowledge("course requirements", [], "key")).rejects.toBeInstanceOf(SearchError);
   });
 });
+
+describe("document upload API", () => {
+  it("sends multipart fields without a manual boundary or provider key", async () => {
+    const { uploadDocument } = await import("./api");
+    const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ document_id: "id", chunks_created: 1, duplicate: false }) });
+    vi.stubGlobal("fetch", fetch);
+    await uploadDocument({ file: new File(["data"], "guide.pdf"), title: "Guide", sourceUrl: "https://example.org/guide.pdf", visibility: "restricted", allowedGroups: "staff" }, ["staff"]);
+    const [url, request] = fetch.mock.calls[0];
+    expect(url).toMatch(/\/documents$/);
+    expect(request.headers).toEqual({ "X-User-Groups": "staff" });
+    expect(request.body).toBeInstanceOf(FormData);
+    expect(request.body.get("title")).toBe("Guide");
+    expect(request.body.get("allowed_groups")).toBe("staff");
+    expect(request.body.get("source_url")).toBe("https://example.org/guide.pdf");
+  });
+
+  it("returns a useful PDF validation message", async () => {
+    const { uploadDocument } = await import("./api");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 422, json: async () => ({ detail: "No extractable text found in PDF" }) }));
+    await expect(uploadDocument({ file: new File(["data"], "scan.pdf"), title: "Scan", sourceUrl: "", visibility: "public", allowedGroups: "" }, [])).rejects.toThrow("No extractable text");
+  });
+});

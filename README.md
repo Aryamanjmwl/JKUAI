@@ -55,6 +55,18 @@ Open **<http://localhost:5173>**. Select **Search sources** and try:
 The Docker demo explicitly enables **simulated roles** in both services. They are not
 login identities. Services bind to localhost; keep this configuration local.
 
+### Add your own documents
+
+Click **Add PDF** in the top-right corner, choose a text PDF, review its title, and click
+**Upload PDF**. You can supply the original source URL so results link back to it.
+The success message shows how many passages were indexed; the document is immediately
+searchable. Uploading the same PDF again reuses its existing record.
+
+In the local role demo, **Selected groups** lets you restrict retrieval to comma-separated
+groups such as `students` or `staff`. Choose a matching simulated role to search a
+restricted document. A duplicate with incompatible permissions returns a conflict;
+reuploading is not an ACL-edit operation.
+
 ### Generate an answer
 
 Switch to **Answer with citations**, enter a working OpenAI API key, and ask the course
@@ -73,11 +85,12 @@ not prove factual support.
 The fictional prerequisites above are not claimed to exist in this official curriculum.
 For a real-document example, download the JKU Computer Science Master's curriculum
 using [the native setup guide](docs/local-development.md#add-an-official-document),
-or use the interactive API at <http://localhost:8000/docs>:
+then use the app’s upload form:
 
 1. Download <https://studienhandbuch.jku.at/texte/1170_7_MS_ComputerScience.pdf>.
-2. Use `POST /documents`: select the PDF, set a title and its source URL, and use `public`
-   visibility. Uploads support text PDFs up to 10 MiB; OCR and encrypted PDFs are unsupported.
+2. Click **Add PDF** at the top of the app. Select the PDF, enter a title and its source
+   URL, and leave access set to **Everyone (public)**. Click **Upload PDF** and wait for
+   **Document added**. Text PDFs up to 10 MiB are supported; scanned/encrypted PDFs are not.
 3. Ask: **How many ECTS points is the written Master's thesis in Computer Science worth?**
 
 The document smoke test checks a supporting passage on physical PDF page 7, along with
@@ -126,7 +139,8 @@ loaded, blocking stale lexical grants. Scores are relevance rankings, not probab
 
 CI runs backend/API tests, client tests and build, real-store integration tests, and the
 same Docker quickstart shown above. Chromium tests use the actual served UI and API to
-check source search, role isolation, answer-mode setup, and a mobile viewport. Artifacts
+check PDF upload, deduplication, source search, role isolation, answer-mode setup,
+and a mobile viewport. Artifacts
 include screenshots and service logs. Paid OpenAI answer quality is not tested in CI.
 
 For native development, test commands, and document upload examples, see

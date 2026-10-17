@@ -47,7 +47,7 @@ Local checks on 17 October 2026:
 - `ruff check .`: passed.
 - `ruff format --check .`: passed.
 - `pytest -q`: 54 passed; two live-stack tests skipped by default.
-- `npm test`: 10 passed, including rendered client interaction tests.
+- `npm test`: 15 passed, including rendered client interaction tests.
 - `npm run build`: passed.
 - Synthetic PDF generation is deterministic and round-trips through the actual parser.
 
@@ -92,10 +92,14 @@ a strict port. Readiness checks the migrated schema and index rather than only p
 liveness, and the seed command diagnoses configuration errors before changing data.
 
 The `docker-demo` CI job follows the README commands from a clean checkout and then
-runs two Chromium checks against the actual containers: source/role behavior and a
+runs Chromium checks against the actual containers: source/role behavior, PDF upload and deduplication, and a
 mobile layout. Its artifact includes screenshots, traces on failure, the check report,
 and service logs. The [PR checks](https://github.com/Aryamanjmwl/JKUAI/pull/2/checks)
 record the result for each revision. This still does not make a paid OpenAI call.
 
 Source excerpts now contain the complete retrieved chunk rather than a 500-character
 prefix, allowing inspection of supporting statements anywhere in the supplied passage.
+
+The web client now exposes PDF ingestion through an Add PDF form, with title, optional
+source URL, explicit access groups, upload progress, validation errors, and duplicate
+feedback. A browser test uploads a new PDF and retrieves its content through the UI.
