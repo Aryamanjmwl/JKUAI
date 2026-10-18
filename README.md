@@ -67,18 +67,41 @@ groups such as `students` or `staff`. Choose a matching simulated role to search
 restricted document. A duplicate with incompatible permissions returns a conflict;
 reuploading is not an ACL-edit operation.
 
-### Generate an answer
+### Generate an answer with Gemini or OpenAI
 
-Enter a working OpenAI API key, and ask the course
-prerequisite question. This is the only step requiring a paid provider account and
-network access to OpenAI. The default model is `gpt-4.1-mini`; set `OPENAI_MODEL` in an
-optional root `.env` and recreate the API to change it.
+The page defaults to **Google Gemini**, using `gemini-3.1-flash-lite`.
+Google currently lists a limited free tier for this model. Eligibility and quotas depend
+on your Google AI Studio project; the app cannot grant credits or change billing plans.
 
-The key stays in browser-tab memory and is forwarded with answer requests. The backend
-sends the question and accessible passages to OpenAI. Do not enter a key into an
-untrusted hosted copy. Click an inline citation to inspect its passage. Missing or
-unknown citation IDs trigger an insufficient-evidence response; valid IDs alone do
-not prove factual support.
+1. Create a key in [Google AI Studio](https://aistudio.google.com/apikey) for a project
+   on the free tier. Paid projects can incur usage charges; check your project tier.
+2. Select **Google Gemini** under **Answer provider**, paste the key into the local app,
+   and choose **Use this key**. Do not put the key in Git, screenshots, or chat messages.
+3. Ask a question supported by your PDF. The answer includes clickable `[S1]` source tags.
+
+Choose **Change API key** to replace the key or select **OpenAI** instead. Switching
+providers clears the key and results while preserving your question. An OpenAI key
+cannot be used with Gemini or vice versa. Keys stay in tab memory and are cleared on
+refresh or Disconnect. The application does not persist them in browser storage or its
+stores. Only the selected provider receives the question and accessible passages.
+Review Google's data terms before using confidential documents, especially on a free tier.
+
+OpenAI uses the Responses API with `gpt-4.1-mini`; Gemini uses Google's documented
+OpenAI-compatible Chat Completions endpoint. Configure `OPENAI_MODEL` or `GEMINI_MODEL`
+in an optional root `.env`, then recreate the API to change models. Defaults are checked
+against provider documentation, but model availability and free quotas may change.
+The compatibility client is shared; retrieval and permission filtering remain local.
+
+If Gemini reports a free-tier limit, check your limits in AI Studio and wait for quota
+to reset. A new key in the same project does not reset quota. No automatic provider
+fallback is performed; failures keep retrieved passages visible. Missing or invented
+citation IDs and incomplete Gemini output produce an insufficient-evidence response;
+valid IDs alone do not prove factual support.
+
+References: [Google compatibility API](https://ai.google.dev/gemini-api/docs/openai),
+[model](https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite),
+[pricing and free tier](https://ai.google.dev/gemini-api/docs/pricing),
+[data terms](https://ai.google.dev/gemini-api/terms).
 
 ## Try a real university PDF
 
@@ -125,7 +148,7 @@ loaded, blocking stale lexical grants. Scores are relevance rankings, not probab
 | Storage | PostgreSQL 16 and 384-dimensional pgvector embeddings |
 | Lexical search | OpenSearch 2.19 BM25 over titles and passage text |
 | Local ML | `all-MiniLM-L6-v2` bi-encoder and `ms-marco-MiniLM-L-6-v2` cross-encoder |
-| Generation | OpenAI Responses API; request-scoped key and bounded output |
+| Generation | Gemini Chat Completions or OpenAI Responses API; request-scoped keys and bounded output |
 | Client | React, TypeScript, Vite; Nginx serves the Docker build and proxies `/api` |
 | Infrastructure | Docker Compose, persistent database/index/model volumes |
 
@@ -134,14 +157,14 @@ loaded, blocking stale lexical grants. Scores are relevance rankings, not probab
 - Interactive API: <http://localhost:8000/docs>.
 - `GET /health`: process liveness.
 - `GET /ready`: migrated database and lexical index readiness; does not run model inference.
-- `POST /search/retrieval`: sources without OpenAI usage.
+- `POST /search/retrieval`: sources without provider usage.
 - `POST /search`: generated answer, retrieved passages, cited filenames, and latency.
 
 CI runs backend/API tests, client tests and build, real-store integration tests, and the
 same Docker quickstart shown above. Chromium tests use the actual served UI and API to
 check PDF upload, deduplication, source search, role isolation, answer-mode setup,
 and a mobile viewport. Artifacts
-include screenshots and service logs. Paid OpenAI answer quality is not tested in CI.
+include screenshots and service logs. Live provider answer quality is not tested in CI; provider contracts use simulated responses.
 
 For native development, test commands, and document upload examples, see
 [local development](docs/local-development.md). The retrieval evaluator reports
@@ -184,11 +207,11 @@ See [architecture](docs/architecture.md), [security](docs/security.md),
 There is one **Ask JKUAI** flow. With a key it generates an answer with clickable
 `[S1]` source tags. Without a key it clearly labels the results as retrieved passages.
 Use **Change API key** in the header to replace a key without losing your question.
-The status **API key set** means the key is entered, not that billing has been verified.
+The status **Gemini key set** or **OpenAI key set** means the key is entered, not that billing has been verified.
 Keys remain in tab memory and are cleared on refresh or Disconnect.
 
 If generation fails, the page keeps accessible source passages visible and shows the
 provider failure separately. Exhausted API credit/billing limits require checking the
-key's OpenAI project billing; a temporary rate limit calls for waiting before retrying.
+key's provider project billing; a temporary rate limit calls for waiting before retrying.
 Creating another key in the same exhausted project does not replenish its credit.
 No key or raw provider error is returned in diagnostic messages.

@@ -349,3 +349,5 @@ footer p { margin: 0; font-size: 12px; }
 .upload-error { color: #8b281d; }
 .upload-success { color: var(--green-700); font-weight: 650; }
 @media (max-width: 600px) { .upload-toggle { font-size: 12px; padding: 8px; } .upload-panel { padding: 18px; } }
+
+.key-form select { width: 100%; padding: 10px; margin-bottom: 14px; border: 1px solid var(--border, #cbd5cf); border-radius: 6px; background: white; color: #33443b; }

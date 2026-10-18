@@ -10,6 +10,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://jku:jku@postgres:5432/jku_search
       OPENSEARCH_URL: http://opensearch:9200
       ENABLE_DEMO_ROLES: "true"
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.1-flash-lite}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
     volumes:
       - model_cache:/var/cache/huggingface

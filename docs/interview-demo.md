@@ -28,11 +28,11 @@ Open <http://localhost:5173> and use **Ask JKUAI** first; without a key it shows
 | 0:00–0:45 | Introduce the problem | University information is scattered across PDFs. Search needs exact identifiers, semantic matches, and traceable answers. |
 | 0:45–1:45 | Choose Public visitor; ask “What do I need before taking Advanced Machine Learning?” | Read the course-guide excerpt and show its page and filename. Explain lexical retrieval plus embeddings, then fusion and reranking. |
 | 1:45–2:45 | Ask “What is the EXAM-OPS-42 internal routing code?” as Public visitor, then Staff member | Public/student searches must not contain the staff operations document or ORCHID-742. Staff can retrieve it. Public search may still return unrelated public passages; do not describe that as a confidence score. |
-| 2:45–3:45 | Connect a working OpenAI API key | Ask the course prerequisite question again. Click [S1] to inspect the supporting passage. Explain that retrieval is local; the permitted passages and question go to OpenAI for generation. |
+| 2:45–3:45 | Connect a Google Gemini free-tier key or a working OpenAI API key | Ask the course prerequisite question again. Click [S1] to inspect the supporting passage. Explain that retrieval is local; the permitted passages and question go to the selected provider for generation. |
 | 3:45–4:30 | Open `services/search.py` and the live integration test | Point out the SQL and OpenSearch filters and the PostgreSQL recheck on lexical hits. The revocation test deliberately leaves the lexical ACL stale. |
 | 4:30–5:00 | Discuss one limitation and next step | Real identity verification is the next security boundary. Outbox-backed ingestion is the next reliability improvement. |
 
-If there is no working OpenAI key or quota, show source search and explain that answer
+If there is no working provider key or quota, show source search and explain that answer
 generation remains unverified in that session. Do not present a saved response as live
 output. Keep keys out of screen sharing, terminal history, and screenshots.
 
@@ -135,7 +135,7 @@ latency and failures. Start with these before adding more model complexity.
 | Seed check fails for staff | Restart the API with `ENABLE_DEMO_ROLES=true`; setting only the frontend flag does not grant backend access. |
 | Role selector is missing | Restart Vite with `VITE_ENABLE_DEMO_ROLES=true`. |
 | First search takes a long time | Complete the model warmup, then run one search before screen sharing. |
-| Search works but answers fail | Check the request key, provider billing/quota, network, and `OPENAI_MODEL` in `.env`. |
+| Search works but answers fail | Check the request key, provider billing/quota, network, and `GEMINI_MODEL` / `OPENAI_MODEL` in `.env`. |
 | Upload returns 409 | The same PDF already exists with an incompatible ACL, or the current role cannot access it. Use the correct role and original ACL. |
 | No passages appear | Confirm the seed finished and `alembic upgrade head` succeeded. `/health` checks process liveness; `/ready` checks the migrated database and index. |
 

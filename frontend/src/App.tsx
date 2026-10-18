@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from "react";
 
-import { SearchError, searchKnowledge } from "./api";
+import { type AnswerProvider, SearchError, searchKnowledge } from "./api";
 import type { SearchResult, Source } from "./types";
 import DocumentUpload from "./DocumentUpload";
 
@@ -33,6 +33,8 @@ export default function App() {
   const [uploading, setUploading] = useState(false);
   const [editingKey, setEditingKey] = useState(false);
   const [answerUnavailable, setAnswerUnavailable] = useState(false);
+  const [provider, setProvider] = useState<AnswerProvider>("gemini");
+  const providerName = provider === "gemini" ? "Gemini" : "OpenAI";
   const [apiKey, setApiKey] = useState("");
   const mode = apiKey ? "answer" : "retrieval";
   const [draftApiKey, setDraftApiKey] = useState("");
@@ -53,7 +55,7 @@ export default function App() {
     setError("");
     setResult(null);
     try {
-      setResult(await searchKnowledge(cleanQuestion, group ? [group] : [], apiKey, mode));
+      setResult(await searchKnowledge(cleanQuestion, group ? [group] : [], apiKey, mode, provider));
     } catch (reason) {
       setAnswerUnavailable(mode === "answer");
       // Keep accessible evidence visible even when the answer provider fails.
@@ -81,7 +83,7 @@ export default function App() {
     void runSearch(query);
   }
 
-  function connectOpenAI(event: FormEvent) {
+  function connectProvider(event: FormEvent) {
     event.preventDefault();
     const cleanKey = draftApiKey.trim();
     if (!cleanKey) return;
@@ -95,7 +97,7 @@ export default function App() {
     setError("");
   }
 
-  function disconnectOpenAI() {
+  function disconnectProvider() {
     setApiKey("");
     setEditingKey(false);
     setDraftApiKey("");
@@ -123,9 +125,9 @@ export default function App() {
           {apiKey && (
             <div className="key-status" role="status">
               <span aria-hidden="true" />
-              <span>API key set</span>
+              <span>{providerName} key set</span>
               <button disabled={loading} onClick={() => { setEditingKey(true); setDraftApiKey(""); setShowApiKey(false); }} type="button">Change API key</button>
-              <button disabled={loading} onClick={disconnectOpenAI} type="button">Disconnect</button>
+              <button disabled={loading} onClick={disconnectProvider} type="button">Disconnect</button>
             </div>
           )}
         </div>
@@ -169,7 +171,7 @@ export default function App() {
                 <span className="shield-icon" aria-hidden="true">✓</span>
                 <div>
                   <p className="connection-step">ONE-TIME SETUP FOR THIS TAB</p>
-                  <h2 id="connection-title">Connect your OpenAI API key</h2>
+                  <h2 id="connection-title">Connect an answer provider</h2>
                   <p>
                     JKUAI searches university documents locally. Your key is used only to turn
                     those sources into a clear answer.
@@ -177,11 +179,20 @@ export default function App() {
                 </div>
               </div>
 
-              <form className="key-form" onSubmit={connectOpenAI}>
-                <label htmlFor="openai-key">OpenAI API key</label>
+              <form className="key-form" onSubmit={connectProvider}>
+                <label htmlFor="answer-provider">Answer provider</label>
+                <select id="answer-provider" disabled={loading} value={provider} onChange={(event) => {
+                  setProvider(event.target.value as AnswerProvider);
+                  setApiKey(""); setDraftApiKey(""); setShowApiKey(false);
+                  setResult(null); setError(""); setAnswerUnavailable(false);
+                }}>
+                  <option value="gemini">Google Gemini — free tier available</option>
+                  <option value="openai">OpenAI — separate API billing</option>
+                </select>
+                <label htmlFor="provider-key">{providerName} API key</label>
                 <div className="key-input-row">
                   <input
-                    id="openai-key"
+                    id="provider-key"
                     type={showApiKey ? "text" : "password"}
                     value={draftApiKey}
                     onChange={(event) => setDraftApiKey(event.target.value)}
@@ -207,17 +218,19 @@ export default function App() {
 
               <div className="key-help">
                 <p><strong>Private for this session.</strong> The key is not saved and is cleared when you refresh or disconnect.</p>
-                <p><strong>Your account pays.</strong> API usage is billed by OpenAI to the account that owns the key.</p>
+                {provider === "gemini"
+                  ? <p><strong>Free tier has limits.</strong> Use a Google AI Studio project on the free tier. JKUAI cannot change your billing plan or guarantee free quota. Only the question and retrieved passages are sent to Google; review its data terms before using private documents.</p>
+                  : <p><strong>Your account pays.</strong> OpenAI API usage is billed separately from ChatGPT.</p>}
               </div>
 
               <div className="key-links">
-                <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer">
-                  Create an OpenAI API key <span aria-hidden="true">↗</span>
+                <a href={provider === "gemini" ? "https://aistudio.google.com/apikey" : "https://platform.openai.com/api-keys"} target="_blank" rel="noreferrer">
+                  Create a {providerName} API key <span aria-hidden="true">↗</span>
                 </a>
                 <details>
                   <summary>How is my key handled?</summary>
                   <p>
-                    It stays in this browser tab and is sent through the JKUAI server to OpenAI
+                    It stays in this browser tab and is sent through the JKUAI server to {providerName}
                     with each question. It is never added to browser storage, cookies, or the
                     JKUAI database. Use only a trusted JKUAI website with HTTPS.
                   </p>

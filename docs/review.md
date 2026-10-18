@@ -12,7 +12,7 @@ Python, FastAPI, PostgreSQL/pgvector, OpenSearch, React, and Docker.
 | OpenSearch / BM25 | Text mappings and `multi_match` over boosted titles and chunk text | Two stores require synchronization and operational work. |
 | Hybrid search | `ranking.reciprocal_rank_fusion` merges lexical and vector rankings | A representative ablation study has not established an improvement over either retriever alone. |
 | Embeddings / reranking | MiniLM sentence-transformer embeddings and MiniLM cross-encoder in `services/ml.py` | Local CPU inference; first use loads model weights. |
-| Grounded answers with citations | Retrieved passages sent through Responses API, source IDs, page metadata, excerpts, cited filenames | Syntax checks validate IDs, not factual entailment. Live provider answer quality was not evaluated during this review. |
+| Grounded answers with citations | Retrieved passages sent through OpenAI Responses or Gemini Chat Completions, source IDs, page metadata, excerpts, cited filenames | Syntax checks validate IDs, not factual entailment. Live provider answer quality was not evaluated during this review. |
 | Permission-aware retrieval | Both retrievers filter ACLs; lexical text is reauthorized in PostgreSQL | Default is public-only. Local role simulation is not authentication or SSO. |
 | React | TypeScript client with source search, answer mode, role demo, errors, and source cards | API keys remain in tab memory; use the key flow only on a trusted local instance. |
 | Docker | Compose runs PostgreSQL/pgvector and OpenSearch with health checks and persistent volumes | The base profile supports native development; the explicit demo overlay also containerizes the API and web client. |
@@ -29,7 +29,7 @@ simulated groups, and describe citations as traceability rather than guaranteed 
 | Duplicate upload could disclose restricted metadata or reuse incompatible permissions | Generic conflict for inaccessible/incompatible duplicates; authorized retries reindex stored metadata | Ingestion tests and live duplicate/conflict checks |
 | Every retrieved filename was labelled as used by the answer | Derive cited filenames from recognized answer markers | API test with a retrieved but uncited document |
 | Missing or invented citation IDs passed through | Explicit insufficient-evidence fallback | Invalid-ID cases and real SDK request/response parsing against a mock HTTP provider |
-| UI could not demonstrate retrieval without an OpenAI account | Separate source search and answer modes | Client request tests and rendered React interaction tests |
+| UI could not demonstrate retrieval without an OpenAI account | One question flow with key-free retrieval and optional cited generation | Client request tests and rendered React interaction tests |
 | Corrupt/oversized PDFs and invalid metadata could fail unpredictably | Bounded reads; PDF, title, HTTP(S) URL, and query validation | API validation tests and fixture PDF round-trip tests |
 | Default model setting was ambiguous | Explicit documented `gpt-4.1-mini` ID; request timeout, output bound, and `store=False` | Real SDK contract test without an external provider call |
 | p95 used a lower rank for small datasets | Nearest-rank percentile; explicit `mrr_at_5` output label; reject empty datasets | Two-observation and 20-observation percentile tests |
@@ -103,3 +103,13 @@ prefix, allowing inspection of supporting statements anywhere in the supplied pa
 The web client now exposes PDF ingestion through an Add PDF form, with title, optional
 source URL, explicit access groups, upload progress, validation errors, and duplicate
 feedback. A browser test uploads a new PDF and retrieves its content through the UI.
+
+## Gemini provider support (18 October 2026)
+
+The UI now defaults to Gemini 3.1 Flash-Lite, with a free tier currently listed by Google.
+A separate provider selector/key header routes Google credentials to a fixed Google
+endpoint, using the existing SDK's documented compatibility interface. OpenAI remains
+supported. Provider switches clear credentials/results; browser storage is not used.
+Tests simulate both providers' HTTP contracts, citation validation, quota/access/model
+errors, UI switching and source-tag navigation. Live Google quota eligibility and answer
+quality require a user's key and are not established by simulated-provider tests.

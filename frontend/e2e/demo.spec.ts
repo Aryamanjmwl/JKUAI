@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("a fresh reviewer can retrieve sources and inspect permission isolation", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "What would you like to know?" })).toBeVisible();
-  await expect(page.getByLabel("OpenAI API key", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Gemini API key", { exact: true })).toBeVisible();
   await page.getByLabel("Simulated role").selectOption("");
   await page.getByLabel("Your question").fill("What do I need before taking Advanced Machine Learning?");
   await page.locator("form.search-form").getByRole("button", { name: "Ask JKUAI" }).click();
@@ -94,6 +94,7 @@ test("answer flow recovers from exhausted credit after changing the API key", as
   });
   await page.goto("/");
   await expect(page.getByRole("button", { name: "Search sources" })).toHaveCount(0);
+  await page.getByLabel("Answer provider").selectOption("openai");
   await page.getByLabel("OpenAI API key", { exact: true }).fill("sk-browser-old");
   await page.getByRole("button", { name: "Use this key" }).click();
   await page.getByLabel("Your question").fill("What is the contact email?");
@@ -111,4 +112,37 @@ test("answer flow recovers from exhausted credit after changing the API key", as
   await expect(page).toHaveURL(/#S1$/);
   await expect(page.getByRole("alert")).toHaveCount(0);
   await page.screenshot({ path: "test-results/answer-source-tags.png", fullPage: true });
+});
+
+test("Gemini answers use their own key and provider switching clears it", async ({ page }) => {
+  // Exercise UI/provider routing without requiring a CI secret or paid provider access.
+  await page.route(/\/search$/, async (route) => {
+    expect(JSON.parse(route.request().postData()!).provider).toBe("gemini");
+    expect(route.request().headers()["x-gemini-api-key"]).toBe("google-browser-test");
+    expect(route.request().headers()["x-openai-api-key"]).toBeUndefined();
+    await route.fulfill({ json: {
+      answer: "Introductory ML is required. [S1]", latency_ms: 1,
+      exact_documents_used: ["guide.pdf"], sources: [{
+        citation_id: "S1", chunk_id: "gemini-source", title: "Course Guide",
+        page_number: 1, excerpt: "Introductory ML is required.", source_url: null,
+      }],
+    } });
+  });
+  await page.goto("/");
+  await expect(page.getByLabel("Answer provider")).toHaveValue("gemini");
+  await page.getByLabel("Gemini API key", { exact: true }).fill("google-browser-test");
+  await page.getByRole("button", { name: "Use this key" }).click();
+  await page.getByLabel("Your question").fill("What do I need before Advanced ML?");
+  await page.getByRole("button", { name: "Ask JKUAI" }).click();
+  await expect(page.locator(".answer-text")).toContainText("Introductory ML is required. [S1]");
+  await page.locator(".answer-text .citation").click();
+  await expect(page).toHaveURL(/#S1$/);
+  await page.getByRole("button", { name: "Change API key" }).click();
+  await page.getByLabel("Answer provider").selectOption("openai");
+  await expect(page.getByLabel("OpenAI API key", { exact: true })).toHaveValue("");
+  await expect(page.locator(".results")).toHaveCount(0);
+  await expect(page.getByLabel("Your question")).toHaveValue("What do I need before Advanced ML?");
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: "test-results/provider-selection.png", fullPage: true });
 });

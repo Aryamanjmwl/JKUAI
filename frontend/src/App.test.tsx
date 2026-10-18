@@ -27,6 +27,7 @@ it("replaces a tab-scoped key and submits the new key with cited answers", async
   vi.stubGlobal("fetch", fetch);
   const user = userEvent.setup();
   render(<App />);
+  await user.selectOptions(screen.getByLabelText("Answer provider"), "openai");
   await user.type(screen.getByLabelText("OpenAI API key"), "sk-old");
   await user.click(screen.getByRole("button", { name: "Use this key" }));
   await user.type(screen.getByLabelText("Your question"), "contact email");
@@ -51,6 +52,7 @@ it("keeps sources and the question when generation fails and allows changing key
   vi.stubGlobal("fetch", fetch);
   const user = userEvent.setup();
   render(<App />);
+  await user.selectOptions(screen.getByLabelText("Answer provider"), "openai");
   await user.type(screen.getByLabelText("OpenAI API key"), "sk-test");
   await user.click(screen.getByRole("button", { name: "Use this key" }));
   await user.type(screen.getByLabelText("Your question"), "contact email");
@@ -60,4 +62,25 @@ it("keeps sources and the question when generation fails and allows changing key
   expect(screen.getByText("Contact office@example.org")).toBeTruthy();
   expect(fetch.mock.calls[1][1].headers).not.toHaveProperty("X-OpenAI-API-Key");
   expect(screen.getByRole("button", { name: "Change API key" })).toBeTruthy();
+});
+
+it("defaults to Gemini and clears its credential when switching providers", async () => {
+  const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => result });
+  vi.stubGlobal("fetch", fetch);
+  const user = userEvent.setup();
+  render(<App />);
+  await user.type(screen.getByLabelText("Gemini API key"), "google-test");
+  await user.click(screen.getByRole("button", { name: "Use this key" }));
+  await user.type(screen.getByLabelText("Your question"), "contact email");
+  await user.click(screen.getByRole("button", { name: "Ask JKUAI" }));
+  await screen.findByText("Based on retrieved documents");
+  expect(fetch.mock.calls[0][1].headers["X-Gemini-API-Key"]).toBe("google-test");
+  expect(fetch.mock.calls[0][1].headers).not.toHaveProperty("X-OpenAI-API-Key");
+  expect(JSON.parse(fetch.mock.calls[0][1].body).provider).toBe("gemini");
+  await user.click(screen.getByRole("button", { name: "Change API key" }));
+  await user.selectOptions(screen.getByLabelText("Answer provider"), "openai");
+  expect((screen.getByLabelText("OpenAI API key") as HTMLInputElement).value).toBe("");
+  expect(screen.queryByText("Based on retrieved documents")).toBeNull();
+  expect(localStorage.length).toBe(0);
+  expect(sessionStorage.length).toBe(0);
 });
