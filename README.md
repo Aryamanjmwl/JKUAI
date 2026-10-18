@@ -31,17 +31,6 @@ docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d --build --
 
 Open **<http://localhost:5173>**.
 
-To load the optional fictional demo PDFs and check the search pipeline, run:
-
-```sh
-docker compose -f docker-compose.yml -f docker-compose.demo.yml run --rm seed
-```
-
-Expect `"status": "passed"`. The demo documents are test examples, not university rules.
-Try **What do I need before taking Advanced Machine Learning?** or switch between
-Public visitor and Staff member for **What is the EXAM-OPS-42 internal routing code?**
-The staff document should appear only for the matching simulated role.
-
 ## Use your own PDF
 
 1. Click **Add PDF**, choose a file, review the title, and click **Upload PDF**.
