@@ -1,10 +1,38 @@
-"""Small, deterministic semester aliases for English/German curriculum search.
+"""Small, deterministic search aliases for university documents.
 
 This expands search terms only; it never supplies facts or changes the question sent
-for answer generation. Other languages and general translation are outside its scope.
+for answer generation. This glossary is not a general translation service.
 """
 
 import re
+
+# Search vocabulary only: no contacts, rules, credit values, or expected answers.
+# Keep expansion out of the embedding and reranking queries: extra generic words
+# can dilute the question's meaning, especially its negations and conditions.
+_GERMAN_SEARCH_TERMS = (
+    (r"\bprerequisites?\b", "Voraussetzung Voraussetzungsprüfung Anmeldevoraussetzungen"),
+    (r"\b(?:grades?|assessments?)\b", "Beurteilung Noten Notenauskunft"),
+    (r"\bpassed\b", "positiv absolviert bestanden"),
+    (r"\b(?:entered|recorded)\b", "eingetragen eingegeben hinterlegt"),
+    (r"\bcontact\b", "wenden zuständig"),
+    (r"\b(?:exams?|examinations?)\b", "Prüfung Prüfungen"),
+    (r"\bparticipants?\b", "Teilnehmer TeilnehmerIn"),
+    (r"\bcourses?\b", "Lehrveranstaltung LVA"),
+    (r"\b(?:find|search)\b", "Suche suchen"),
+    (r"\bregist(?:er|ered|ering|ration)\b", "Anmeldung anmelden"),
+    (r"\bwithdraw(?:al)?\b", "Abmeldung abmelden"),
+    (r"\b(?:overlaps?|collisions?)\b", "Überschneidung Terminkollision"),
+    (r"\btimetable\b", "Stundenplan"),
+)
+
+
+def lexical_query(query: str) -> str:
+    """Bridge common English terms to German BM25 tokens without an API call."""
+    aliases = [
+        terms for pattern, terms in _GERMAN_SEARCH_TERMS if re.search(pattern, query, re.IGNORECASE)
+    ]
+    expanded = semester_query(query)
+    return expanded + (" " + " ".join(aliases) if aliases else "")
 
 
 def semester_query(query: str) -> str:

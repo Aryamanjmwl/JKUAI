@@ -98,7 +98,7 @@ it("does not show the verification badge for an abstained answer", async () => {
   await user.type(screen.getByLabelText("Your question"), "winter semester courses");
   await user.click(screen.getByRole("button", { name: "Ask JKUAI" }));
   await screen.findByText("I could not establish an answer from the accessible sources.");
-  expect(screen.queryByText("Easy to verify")).toBeNull();
+  expect(screen.queryByText("Check the cited sources")).toBeNull();
 });
 
 it("renders answer lists and bold text while allowing only known source links", async () => {

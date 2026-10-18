@@ -75,6 +75,45 @@ def test_semester_aliases_preserve_question_and_add_shared_search_terms():
     assert semester_query("course prerequisites") == "course prerequisites"
 
 
+def test_english_keyword_aliases_do_not_change_semantic_query_or_permissions():
+    query = "How can I find an exam when I am not a participant in the course?"
+    session = AsyncMock()
+    session.execute.return_value = Mock(all=Mock(return_value=[]))
+    with (
+        patch(
+            "app.services.search.embed_texts_async", AsyncMock(return_value=[[0.1] * 384])
+        ) as embed,
+        patch(
+            "app.services.search.search_async",
+            AsyncMock(return_value={"hits": {"hits": []}}),
+        ) as lexical,
+        patch("app.services.search.rerank_async", AsyncMock(return_value=[])) as rerank,
+    ):
+        asyncio.run(hybrid_search(session, query, UserContext("guest", ())))
+    assert embed.call_args.args[0] == [query]
+    assert rerank.call_args.args[0] == query
+    body = lexical.call_args.args[0]
+    expanded = body["query"]["bool"]["must"][0]["multi_match"]["query"]
+    assert expanded.startswith(query)
+    assert all(
+        term in expanded for term in ("Prüfungen", "Teilnehmer", "Lehrveranstaltung", "Suche")
+    )
+    assert body["query"]["bool"]["filter"] == [
+        {"bool": {"should": [{"term": {"visibility": "public"}}], "minimum_should_match": 1}}
+    ]
+
+
+def test_keyword_aliases_leave_german_and_unrelated_questions_unchanged():
+    from app.services.query import lexical_query
+
+    for query in (
+        "Wie finde ich eine Prüfung ohne Teilnehmerstatus?",
+        "What is the robotics laboratory address?",
+        "Where is the courseware for the research project?",
+    ):
+        assert lexical_query(query) == query
+
+
 def test_unique_lexical_candidate_survives_until_reranking():
     from app.config import Settings
 

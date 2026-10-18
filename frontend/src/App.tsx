@@ -333,8 +333,8 @@ export default function App() {
 
               {mode === "answer" && !answerUnavailable && sourceCount > 0 && result.exact_documents_used.length > 0 && (
                 <div className="verification-note">
-                  <span aria-hidden="true">✓</span>
-                  <p><strong>Easy to verify</strong>Select a citation in the answer or open a source document to check the information.</p>
+                  <span aria-hidden="true">i</span>
+                  <p><strong>Check the cited sources</strong>Citations do not guarantee correctness. Check the passage and document date before relying on an answer.</p>
                 </div>
               )}
 

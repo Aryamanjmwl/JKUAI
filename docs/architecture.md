@@ -32,8 +32,11 @@ hit the unique-checksum constraint.
 
 1. The default API treats callers as anonymous. Explicit demo mode accepts simulated
    user/group headers; these are not verified identities.
-2. `services/query.py` adds deterministic English/German semester search aliases. It is
-   not a general translation service. The original question is retained for generation.
+2. `services/query.py` adds deterministic English/German semester search aliases.
+   Keyword search also adds German equivalents of common English university terms
+   (for example, grade/Beurteilung and exam/Prüfung). These extra terms do not enter
+   embedding or reranking queries. This limited glossary is not general translation;
+   the original question is retained for generation. No reindexing or provider call is needed.
 3. PostgreSQL filters document permissions before retrieving up to 20 chunks by cosine
    distance. OpenSearch independently filters permissions before returning up to 20
    BM25 matches over `title^2` and `content`.

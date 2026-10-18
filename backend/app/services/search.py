@@ -9,7 +9,7 @@ from ..models import Chunk, Document
 from ..ranking import reciprocal_rank_fusion
 from .ml import embed_texts_async, rerank_async
 from .opensearch import search_async
-from .query import semester_query
+from .query import lexical_query, semester_query
 
 
 def _permission_clause(user: UserContext):
@@ -61,7 +61,7 @@ async def hybrid_search(session: AsyncSession, query: str, user: UserContext) ->
                     "must": [
                         {
                             "multi_match": {
-                                "query": retrieval_query,
+                                "query": lexical_query(query),
                                 "fields": ["title^2", "content"],
                             }
                         }
