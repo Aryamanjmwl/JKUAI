@@ -71,7 +71,7 @@ def main() -> None:
                 "mrr_at_5": statistics.mean(reciprocal_ranks),
                 "latency_ms_mean": statistics.mean(latencies),
                 "latency_ms_p95": percentile_nearest_rank(latencies, 0.95),
-                "answer_correctness": "Add an LLM-judge or human score in phase 2",
+                "answer_correctness": "not_evaluated",
             },
             indent=2,
         )

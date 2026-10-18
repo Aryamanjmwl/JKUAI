@@ -1,4 +1,3 @@
-from time import perf_counter
 from uuid import UUID
 
 from sqlalchemy import and_, or_, select
@@ -99,9 +98,3 @@ async def hybrid_search(session: AsyncSession, query: str, user: UserContext) ->
     # reranking so a useful lexical-only hit is not discarded by an early cutoff.
     fused = reciprocal_rank_fusion(vector_hits, lexical_hits)
     return await rerank_async(retrieval_query, fused, settings.rerank_k)
-
-
-async def timed_hybrid_search(session: AsyncSession, query: str, user: UserContext):
-    start = perf_counter()
-    hits = await hybrid_search(session, query, user)
-    return hits, (perf_counter() - start) * 1000

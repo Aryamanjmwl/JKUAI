@@ -23,8 +23,6 @@ test("a fresh reviewer can retrieve sources and inspect permission isolation", a
   const staffPassage = page.locator(".source-card").filter({ hasText: "Staff Operations" }).locator("p");
   expect(await staffPassage.evaluate((element) => element.scrollHeight <= element.clientHeight + 1)).toBe(true);
   await page.screenshot({ path: "test-results/staff-source-search.png", fullPage: true });
-
-
 });
 
 test("source search fits a phone viewport", async ({ page }) => {
@@ -121,7 +119,7 @@ test("Gemini answers use their own key and provider switching clears it", async 
     expect(route.request().headers()["x-gemini-api-key"]).toBe("google-browser-test");
     expect(route.request().headers()["x-openai-api-key"]).toBeUndefined();
     await route.fulfill({ json: {
-      answer: "Introductory ML is required. [S1]", latency_ms: 1,
+      answer: "Recommended courses:\n\n- **Introductory ML** is required. [S1]", latency_ms: 1,
       exact_documents_used: ["guide.pdf"], sources: [{
         citation_id: "S1", chunk_id: "gemini-source", title: "Course Guide",
         page_number: 1, excerpt: "Introductory ML is required.", source_url: null,
@@ -135,6 +133,8 @@ test("Gemini answers use their own key and provider switching clears it", async 
   await page.getByLabel("Your question").fill("What do I need before Advanced ML?");
   await page.getByRole("button", { name: "Ask JKUAI" }).click();
   await expect(page.locator(".answer-text")).toContainText("Introductory ML is required. [S1]");
+  await expect(page.locator(".answer-text li strong")).toHaveText("Introductory ML");
+  await page.screenshot({ path: "test-results/formatted-answer.png", fullPage: true });
   await page.locator(".answer-text .citation").click();
   await expect(page).toHaveURL(/#S1$/);
   await page.getByRole("button", { name: "Change API key" }).click();

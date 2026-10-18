@@ -1,4 +1,5 @@
 import { type FormEvent, useState } from "react";
+import Markdown from "react-markdown";
 
 import { type AnswerProvider, SearchError, searchKnowledge } from "./api";
 import type { SearchResult, Source } from "./types";
@@ -14,18 +15,25 @@ const DEMO_ROLES_ENABLED = import.meta.env.VITE_ENABLE_DEMO_ROLES === "true";
 function AnswerText({ answer, sources }: { answer: string; sources: Source[] }) {
   const sourceIds = new Set(sources.map((source) => source.citation_id));
 
-  return answer.split(/(\[S\d+\])/g).map((part, index) => {
-    const citationId = part.match(/^\[(S\d+)\]$/)?.[1];
-    if (!citationId || !sourceIds.has(citationId)) {
-      return <span key={`${part}-${index}`}>{part}</span>;
-    }
-    return (
-      <a className="citation" href={`#${citationId}`} key={`${citationId}-${index}`}>
-        {part}
-        <span className="sr-only"> Go to source {citationId.slice(1)}</span>
-      </a>
-    );
-  });
+  const markdown = answer.replace(/\[(S\d+)\]/g, (marker, id: string) =>
+    sourceIds.has(id) ? `[${marker}](#${id})` : marker,
+  );
+
+  return (
+    <Markdown
+      skipHtml
+      allowedElements={["p", "strong", "em", "ul", "ol", "li", "code", "pre", "blockquote", "a", "h2", "h3", "h4", "hr", "br"]}
+      components={{
+        a({ href, children }) {
+          const id = href?.match(/^#(S\d+)$/)?.[1];
+          if (!id || !sourceIds.has(id)) return <span>{children}</span>;
+          return <a className="citation" href={`#${id}`}>
+            {children}<span className="sr-only"> Go to source {id.slice(1)}</span>
+          </a>;
+        },
+      }}
+    >{markdown}</Markdown>
+  );
 }
 
 export default function App() {
@@ -319,9 +327,9 @@ export default function App() {
                 <span className="source-count">{sourceCount} {sourceCount === 1 ? "source" : "sources"}</span>
               </div>
 
-              <p className="answer-text">
+              <div className="answer-text">
                 <AnswerText answer={answerUnavailable ? "Answer generation failed. You can still inspect the retrieved passages below." : result.answer} sources={result.sources} />
-              </p>
+              </div>
 
               {mode === "answer" && !answerUnavailable && sourceCount > 0 && result.exact_documents_used.length > 0 && (
                 <div className="verification-note">
