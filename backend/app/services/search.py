@@ -1,3 +1,4 @@
+import asyncio
 from uuid import UUID
 
 from sqlalchemy import and_, or_, select
@@ -9,7 +10,7 @@ from ..models import Chunk, Document
 from ..ranking import reciprocal_rank_fusion
 from .ml import embed_texts_async, rerank_async
 from .opensearch import search_async
-from .query import semester_query
+from .query import lexical_query, semester_query
 
 
 def _permission_clause(user: UserContext):
@@ -53,15 +54,16 @@ async def hybrid_search(session: AsyncSession, query: str, user: UserContext) ->
     permission_filter: list[dict] = [{"term": {"visibility": "public"}}]
     if user.groups:
         permission_filter.append({"terms": {"allowed_groups": list(user.groups)}})
-    response = await search_async(
-        {
+
+    def keyword_request(text: str) -> dict:
+        return {
             "size": settings.retrieve_k,
             "query": {
                 "bool": {
                     "must": [
                         {
                             "multi_match": {
-                                "query": retrieval_query,
+                                "query": text,
                                 "fields": ["title^2", "content"],
                             }
                         }
@@ -70,9 +72,16 @@ async def hybrid_search(session: AsyncSession, query: str, user: UserContext) ->
                 }
             },
         }
-    )
-    lexical_ids = [UUID(hit["_source"]["chunk_id"]) for hit in response["hits"]["hits"]]
-    lexical_hits: list[dict] = []
+
+    # Preserve the original channel: expansion must not evict its useful hits.
+    keyword_queries = list(dict.fromkeys([retrieval_query, lexical_query(query)]))
+    responses = await asyncio.gather(*(search_async(keyword_request(q)) for q in keyword_queries))
+    lexical_rankings = [
+        [UUID(hit["_source"]["chunk_id"]) for hit in response["hits"]["hits"]]
+        for response in responses
+    ]
+    lexical_ids = list(dict.fromkeys(item for ranking in lexical_rankings for item in ranking))
+    lexical_hits: list[list[dict]] = []
     if lexical_ids:
         # PostgreSQL is authoritative: a stale lexical index must never bypass an ACL change.
         lexical_stmt = (
@@ -93,8 +102,11 @@ async def hybrid_search(session: AsyncSession, query: str, user: UserContext) ->
             }
             for chunk, document in rows
         }
-        lexical_hits = [by_id[str(item)] for item in lexical_ids if str(item) in by_id]
+        lexical_hits = [
+            [by_id[str(item)] for item in ranking if str(item) in by_id]
+            for ranking in lexical_rankings
+        ]
     # Each channel is already bounded by retrieve_k. Preserve their union until
     # reranking so a useful lexical-only hit is not discarded by an early cutoff.
-    fused = reciprocal_rank_fusion(vector_hits, lexical_hits)
+    fused = reciprocal_rank_fusion(vector_hits, *lexical_hits)
     return await rerank_async(retrieval_query, fused, settings.rerank_k)

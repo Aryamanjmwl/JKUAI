@@ -12,6 +12,12 @@ def test_fixture_pdfs_are_deterministic_and_extractable():
         assert " ".join(pages[0].text.split()) == fixture["text"]
 
 
+def test_synthetic_pdf_preserves_german_search_terms():
+    text = "Prüfungen: vorläufige Beurteilung, zuständiges Institut und Überschneidungen."
+    pages = parse_pdf(build_pdf(text))
+    assert " ".join(pages[0].text.split()) == text
+
+
 def test_cli_explains_how_to_enable_roles_before_uploading(monkeypatch, capsys):
     import sys
     from unittest.mock import Mock, patch

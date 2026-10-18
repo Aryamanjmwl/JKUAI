@@ -106,6 +106,12 @@ Docker settings are for development. Public deployment needs real authentication
 server-verified permissions, and production infrastructure. Source tags provide
 traceability, not a guarantee that every generated claim is correct.
 
+English and German questions are accepted. German keyword aliases help English questions
+find German passages, but bilingual accuracy is still being evaluated. In a small manual
+check before this change, two English questions missed answers that their German versions
+found. This is a known retrieval limitation, not an API-key problem. Check document dates:
+an older university guide does not establish today's rules or contact details.
+
 - [Local development and tests](docs/local-development.md)
 - [How the search pipeline works](docs/architecture.md)
 - [Security boundaries](docs/security.md)
