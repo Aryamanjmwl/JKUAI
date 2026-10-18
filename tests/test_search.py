@@ -92,7 +92,9 @@ def test_english_keyword_aliases_do_not_change_semantic_query_or_permissions():
         asyncio.run(hybrid_search(session, query, UserContext("guest", ())))
     assert embed.call_args.args[0] == [query]
     assert rerank.call_args.args[0] == query
-    body = lexical.call_args.args[0]
+    assert lexical.call_count == 2
+    original_body, body = [call.args[0] for call in lexical.call_args_list]
+    assert original_body["query"]["bool"]["must"][0]["multi_match"]["query"] == query
     expanded = body["query"]["bool"]["must"][0]["multi_match"]["query"]
     assert expanded.startswith(query)
     assert all(
@@ -121,12 +123,13 @@ def test_unique_lexical_candidate_survives_until_reranking():
         id=uuid4(), title="Curriculum", file_name="guide.pdf", source_url=None
     )
     vector_chunk = SimpleNamespace(id=uuid4(), page_number=1, content="Cover")
+    original_chunk = SimpleNamespace(id=uuid4(), page_number=5, content="StEOP credit limit")
     lexical_chunk = SimpleNamespace(
         id=uuid4(), page_number=10, content="First winter semester courses"
     )
     vector_rows, lexical_rows = Mock(), Mock()
     vector_rows.all.return_value = [(vector_chunk, document, 0.2)]
-    lexical_rows.all.return_value = [(lexical_chunk, document)]
+    lexical_rows.all.return_value = [(original_chunk, document), (lexical_chunk, document)]
     session = AsyncMock()
     session.execute.side_effect = [vector_rows, lexical_rows]
     with (
@@ -135,7 +138,10 @@ def test_unique_lexical_candidate_survives_until_reranking():
         patch(
             "app.services.search.search_async",
             AsyncMock(
-                return_value={"hits": {"hits": [{"_source": {"chunk_id": str(lexical_chunk.id)}}]}}
+                side_effect=[
+                    {"hits": {"hits": [{"_source": {"chunk_id": str(original_chunk.id)}}]}},
+                    {"hits": {"hits": [{"_source": {"chunk_id": str(lexical_chunk.id)}}]}},
+                ]
             ),
         ),
         patch("app.services.search.rerank_async", AsyncMock(return_value=[])) as rerank,
@@ -143,5 +149,6 @@ def test_unique_lexical_candidate_survives_until_reranking():
         asyncio.run(hybrid_search(session, "winter semester courses", UserContext("guest", ())))
     assert {hit["chunk_id"] for hit in rerank.call_args.args[1]} == {
         str(vector_chunk.id),
+        str(original_chunk.id),
         str(lexical_chunk.id),
     }

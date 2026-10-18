@@ -39,11 +39,13 @@ hit the unique-checksum constraint.
    the original question is retained for generation. No reindexing or provider call is needed.
 3. PostgreSQL filters document permissions before retrieving up to 20 chunks by cosine
    distance. OpenSearch independently filters permissions before returning up to 20
-   BM25 matches over `title^2` and `content`.
+   BM25 matches over `title^2` and `content`. When keyword aliases are added, a second
+   keyword request runs concurrently; its matches supplement the original 20.
 4. Lexical IDs are loaded from PostgreSQL with its permission filter again. This blocks
    stale lexical grants. Stale denials may still reduce recall until indexing is repaired.
 5. Reciprocal Rank Fusion merges both lists by chunk ID, adding `1 / (60 + rank)` for
-   each occurrence. The union, at most 40 candidates by default, reaches the reranker.
+   each occurrence. The union, at most 60 candidates with expansion or 40 without it
+   by default, reaches the reranker. Original-channel hits are preserved until this step.
 6. The local multilingual `mmarco-mMiniLMv2-L12-H384-v1` cross-encoder returns the best
    five passages. Scores are relevance rankings, not confidence percentages.
 
