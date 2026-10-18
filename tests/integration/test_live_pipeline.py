@@ -143,6 +143,7 @@ def test_german_curriculum_semester_tables_are_retrievable_in_both_languages():
         for query in [
             "Which courses are recommended in the first winter semester of Bachelor Informatik?",
             "Welche Lehrveranstaltungen sind im ersten Wintersemester Informatik empfohlen?",
+            "which courses can be applied in winter semester?",
         ]:
             response = api.post("/search/retrieval", json={"query": query})
             response.raise_for_status()
@@ -154,7 +155,8 @@ def test_german_curriculum_semester_tables_are_retrievable_in_both_languages():
                 and "winter semester" in s["excerpt"]
             ]
             assert matches, f"Missing winter study-plan evidence for: {query}"
-            assert any("Softwareentwicklung 1" in s["excerpt"] for s in matches), query
+            if "first" in query or "ersten" in query:
+                assert any("Softwareentwicklung 1" in s["excerpt"] for s in matches), query
             assert all(s["source_url"] == source_url for s in matches)
 
         # Simulate an older extractor with fewer, flattened rows. The duplicate upload
