@@ -147,6 +147,7 @@ def test_german_curriculum_semester_tables_are_retrievable_in_both_languages():
         ]:
             response = api.post("/search/retrieval", json={"query": query})
             response.raise_for_status()
+            print(query, response.json()["sources"])
             matches = [
                 s
                 for s in response.json()["sources"]

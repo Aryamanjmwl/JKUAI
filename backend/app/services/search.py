@@ -10,6 +10,7 @@ from ..models import Chunk, Document
 from ..ranking import reciprocal_rank_fusion
 from .ml import embed_texts_async, rerank_async
 from .opensearch import search_async
+from .query import semester_query
 
 
 def _permission_clause(user: UserContext):
@@ -26,7 +27,8 @@ def _permission_clause(user: UserContext):
 
 async def hybrid_search(session: AsyncSession, query: str, user: UserContext) -> list[dict]:
     settings = get_settings()
-    vector = (await embed_texts_async([query]))[0]
+    retrieval_query = semester_query(query)
+    vector = (await embed_texts_async([retrieval_query]))[0]
     stmt = (
         select(Chunk, Document, Chunk.embedding.cosine_distance(vector).label("distance"))
         .join(Document)
@@ -57,7 +59,14 @@ async def hybrid_search(session: AsyncSession, query: str, user: UserContext) ->
             "size": settings.retrieve_k,
             "query": {
                 "bool": {
-                    "must": [{"multi_match": {"query": query, "fields": ["title^2", "content"]}}],
+                    "must": [
+                        {
+                            "multi_match": {
+                                "query": retrieval_query,
+                                "fields": ["title^2", "content"],
+                            }
+                        }
+                    ],
                     "filter": [{"bool": {"should": permission_filter, "minimum_should_match": 1}}],
                 }
             },
@@ -86,8 +95,10 @@ async def hybrid_search(session: AsyncSession, query: str, user: UserContext) ->
             for chunk, document in rows
         }
         lexical_hits = [by_id[str(item)] for item in lexical_ids if str(item) in by_id]
-    fused = reciprocal_rank_fusion(vector_hits, lexical_hits)[: settings.retrieve_k]
-    return await rerank_async(query, fused, settings.rerank_k)
+    # Each channel is already bounded by retrieve_k. Preserve their union until
+    # reranking so a useful lexical-only hit is not discarded by an early cutoff.
+    fused = reciprocal_rank_fusion(vector_hits, lexical_hits)
+    return await rerank_async(retrieval_query, fused, settings.rerank_k)
 
 
 async def timed_hybrid_search(session: AsyncSession, query: str, user: UserContext):
