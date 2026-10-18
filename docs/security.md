@@ -48,6 +48,13 @@ A production service should keep the provider credential in server-side secret s
 never send it to the browser, and protect its use with authenticated accounts, rate
 limits, per-user quotas, spending alerts, and credential rotation.
 
+## Answer rendering
+
+Model output is untrusted. The client renders a restricted set of Markdown elements,
+skips raw HTML, and does not render model-supplied images or arbitrary external links.
+Only citation links to known source cards are clickable within an answer. Original
+source URLs remain available separately on the source cards.
+
 ## Local-development assumptions
 
 The supplied Compose file exposes PostgreSQL and OpenSearch to the host, uses a known
@@ -63,7 +70,7 @@ Before deployment to untrusted users:
 1. Add an identity provider and validate signed sessions or tokens at the API boundary.
 2. Derive groups server-side and test ACL synchronization, revocation, and index parity.
 3. Restrict document ingestion to an authenticated administrative role.
-4. Store Provider credentials in a managed secret store and remove browser key entry.
+4. Store provider credentials in a managed secret store and remove browser key entry.
 5. Put the API behind HTTPS, a restrictive proxy, rate limits, request-size limits, and
    explicit security headers.
 6. Replace development database credentials; enable transport authentication and

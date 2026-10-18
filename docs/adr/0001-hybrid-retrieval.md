@@ -9,7 +9,7 @@ University questions contain both exact identifiers such as course codes and sem
 
 ## Decision
 
-Use OpenSearch BM25 for lexical retrieval and PostgreSQL with pgvector for semantic retrieval. Apply the same access-control predicate to each system before merging results with Reciprocal Rank Fusion. Rerank the merged top 20 with a cross-encoder and expose the best five chunks to answer generation.
+Use OpenSearch BM25 for lexical retrieval and PostgreSQL with pgvector for semantic retrieval. Apply the same access-control predicate to each system before merging results with Reciprocal Rank Fusion. Rerank the complete merged union (up to 40 candidates by default) with a multilingual cross-encoder and expose the best five chunks to answer generation.
 
 ## Consequences
 

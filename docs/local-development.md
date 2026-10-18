@@ -2,7 +2,7 @@
 
 The root README's Docker demo is the shortest reviewer path. Use this guide to run or
 change the API and client directly. Commands assume the repository root unless stated.
-Use Python 3.11 or 3.12, Node.js 22.12+, and Docker Compose v2.20+.
+Use Python 3.11–3.13 (CI uses 3.12), Node.js 22.12+, and Docker Compose v2.20+.
 
 ## Windows / PowerShell 7
 
@@ -12,6 +12,7 @@ cd JKUAI
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
+python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
 python -m pip install -e ".[cpu,dev]"
 Copy-Item .env.example .env
 ```
@@ -55,6 +56,7 @@ git clone https://github.com/Aryamanjmwl/JKUAI.git
 cd JKUAI
 python3 -m venv .venv
 . .venv/bin/activate
+python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
 python -m pip install -e '.[cpu,dev]'
 cp .env.example .env
 docker compose up -d --wait --wait-timeout 180
@@ -108,7 +110,7 @@ Ask a question the document supports, such as the written Master's thesis credit
 allocation. The fictional Advanced Machine Learning prerequisites are demonstrated
 by `demo-course-guide.pdf`, not by this real curriculum.
 
-### Retrieval API example without an OpenAI key
+### Retrieval API example without a provider key
 
 PowerShell:
 
@@ -158,8 +160,11 @@ Or, on Linux:
 RUN_INTEGRATION=1 pytest -q tests/integration
 ```
 
-The official-document test additionally needs `OFFICIAL_PDF` pointing to the downloaded
-curriculum. The test changes and restores fixture ACLs; use a local test corpus.
+The master's curriculum test also needs `OFFICIAL_PDF` pointing to the downloaded
+curriculum. The German bachelor curriculum test needs `OFFICIAL_BACHELOR_PDF` pointing
+to `https://studienhandbuch.jku.at/texte/1171_12_BS_Informatik.pdf`. It checks English/German
+semester questions and refresh of older extraction. These tests modify test data and
+fixture ACLs; use a local test corpus, not documents you need to preserve.
 
 With the full Docker demo running and seeded, run the actual browser checks from `frontend`:
 
@@ -181,3 +186,15 @@ Group-specific rows require the API's demo-role setting. Metrics are document Re
 and MRR@5 over the first five returned chunks, plus mean and nearest-rank p95 latency.
 This does not evaluate generated answer correctness or produce a representative
 benchmark without a reviewed dataset.
+
+
+## Model settings
+
+Native development reads the root `.env`. The Docker demo passes `GEMINI_MODEL` and
+`OPENAI_MODEL` from an optional root `.env`; recreate its API container after changing
+either setting. Other native settings are documented in `.env.example` and
+`backend/app/config.py`. Provider availability and quotas can change.
+
+The reranker can change without replacing stored embeddings. Changing the embedding
+model requires rebuilding every stored vector; matching dimensions alone is not enough.
+There is no automatic embedding-model migration.

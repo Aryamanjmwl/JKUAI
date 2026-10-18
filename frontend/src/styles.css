@@ -243,7 +243,7 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp
 .panel-heading, .sources-heading { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; }
 .panel-heading h2, .sources-heading h2 { margin: 0; font-size: 18px; letter-spacing: -.015em; }
 .source-count { padding: 6px 10px; border-radius: 999px; color: var(--green-700); background: var(--green-100); font-size: 12px; font-weight: 750; white-space: nowrap; }
-.answer-text { margin: 28px 0; white-space: pre-wrap; font-family: Georgia, "Times New Roman", serif; font-size: 21px; line-height: 1.65; }
+.answer-text { margin: 28px 0; font-family: Georgia, "Times New Roman", serif; font-size: 21px; line-height: 1.65; }
 .citation {
   display: inline-block;
   margin: 0 1px;
@@ -258,6 +258,12 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp
   text-decoration: none;
   vertical-align: .25em;
 }
+.answer-text > :first-child { margin-top: 0; }
+.answer-text > :last-child { margin-bottom: 0; }
+.answer-text p { margin: 0 0 1em; }
+.answer-text ul, .answer-text ol { padding-left: 1.4em; }
+.answer-text li + li { margin-top: .4em; }
+.answer-text pre { overflow-x: auto; font-size: .8em; }
 .verification-note { display: flex; gap: 12px; padding: 15px 17px; border-radius: 11px; background: #f0f7f3; }
 .verification-note > span { display: grid; place-items: center; width: 23px; height: 23px; border-radius: 50%; color: white; background: var(--green-700); font-size: 13px; }
 .verification-note p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
@@ -272,7 +278,6 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp
 .source-card { scroll-margin-top: 18px; padding: 17px; border: 1px solid var(--line); border-radius: 11px; background: #fbfcfb; transition: border-color .15s ease, box-shadow .15s ease; }
 .source-card:target { border-color: var(--green-700); box-shadow: 0 0 0 4px rgba(29, 103, 71, .1); }
 .source-meta { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 12px; }
-.source-number { display: grid; place-items: center; width: 23px; height: 23px; border-radius: 6px; color: white; background: var(--green-700); font-weight: 800; }
 .source-card h3 { margin: 12px 0 8px; font-size: 15px; line-height: 1.35; }
 .source-card p { overflow-wrap: anywhere; margin: 0 0 13px; color: var(--muted); font-size: 13px; line-height: 1.55; }
 .source-card a { color: var(--green-700); font-size: 13px; font-weight: 750; text-decoration: none; }
@@ -331,10 +336,6 @@ footer p { margin: 0; font-size: 12px; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 
-.search-modes { display: flex; gap: 0.75rem; margin: 1.5rem 0; flex-wrap: wrap; }
-.search-modes button { padding: 0.7rem 1rem; border: 1px solid #687d70; border-radius: 8px; background: white; color: #264c3c; cursor: pointer; font: inherit; }
-.search-modes button[aria-pressed="true"] { background: #264c3c; color: white; }
-.search-modes button:disabled { opacity: 0.6; cursor: wait; }
 
 .upload-toggle, .upload-submit { padding: 9px 14px; border: 1px solid var(--green-700); border-radius: 8px; background: white; color: var(--green-700); font: inherit; cursor: pointer; }
 .upload-panel { max-width: 860px; margin: 0 auto 36px; padding: 24px; border: 1px solid var(--line); border-radius: 12px; background: white; }

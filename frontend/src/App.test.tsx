@@ -100,3 +100,25 @@ it("does not show the verification badge for an abstained answer", async () => {
   await screen.findByText("I could not establish an answer from the accessible sources.");
   expect(screen.queryByText("Easy to verify")).toBeNull();
 });
+
+it("renders answer lists and bold text while allowing only known source links", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+    ...result,
+    answer: "Recommended courses:\n\n* **Software:** Systems Programming [S1]\n* Unknown source [S9]\n\n[Other link](https://example.org)\n\n<script>alert('unsafe')</script>\n\n<img src='https://example.org/pixel' />\n\n![Remote image](https://example.org/image.png)",
+  }) }));
+  const user = userEvent.setup();
+  const { container } = render(<App />);
+  await user.type(screen.getByLabelText("Gemini API key"), "test-key");
+  await user.click(screen.getByRole("button", { name: "Use this key" }));
+  await user.type(screen.getByLabelText("Your question"), "recommended courses");
+  await user.click(screen.getByRole("button", { name: "Ask JKUAI" }));
+  const bold = await screen.findByText("Software:");
+  expect(bold.tagName).toBe("STRONG");
+  expect(bold.closest("li")).toBeTruthy();
+  const answer = container.querySelector(".answer-text")!;
+  expect(answer.querySelector("a.citation")?.getAttribute("href")).toBe("#S1");
+  expect(answer.querySelectorAll("a").length).toBe(1);
+  expect(answer.querySelectorAll("script, img").length).toBe(0);
+  expect(answer.textContent).toContain("[S9]");
+  expect(answer.textContent).not.toContain("**Software:");
+});
