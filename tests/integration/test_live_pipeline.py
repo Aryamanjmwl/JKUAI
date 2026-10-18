@@ -156,7 +156,27 @@ def test_german_curriculum_semester_tables_are_retrievable_in_both_languages():
             assert matches, f"Missing winter study-plan evidence for: {query}"
             assert any("Softwareentwicklung 1" in s["excerpt"] for s in matches), query
             assert all(s["source_url"] == source_url for s in matches)
-        # Re-upload retains identity and does not duplicate indexed passages.
+
+        # Simulate an older extractor with fewer, flattened rows. The duplicate upload
+        # must rebuild embeddings and append missing rows without changing identity.
+        async def simulate_legacy_extraction():
+            settings = get_settings()
+            connection = await asyncpg.connect(
+                settings.database_url.replace("postgresql+asyncpg:", "postgresql:")
+            )
+            try:
+                await connection.execute(
+                    "DELETE FROM chunks WHERE document_id=$1::uuid AND chunk_index > 0",
+                    document_id,
+                )
+                await connection.execute(
+                    "UPDATE chunks SET content='Legacy flattened table' WHERE document_id=$1::uuid",
+                    document_id,
+                )
+            finally:
+                await connection.close()
+
+        asyncio.run(simulate_legacy_extraction())
         repeated = api.post(
             "/documents",
             data={"title": "Same curriculum"},
@@ -166,3 +186,13 @@ def test_german_curriculum_semester_tables_are_retrievable_in_both_languages():
         assert repeated.json()["duplicate"] is True
         assert repeated.json()["document_id"] == document_id
         assert repeated.json()["chunks_created"] == upload.json()["chunks_created"]
+
+        repaired = api.post(
+            "/search/retrieval", json={"query": "first winter semester Softwareentwicklung 1"}
+        )
+        repaired.raise_for_status()
+        assert any(
+            s["document_id"] == document_id and "winter semester" in s["excerpt"]
+            for s in repaired.json()["sources"]
+        )
+        assert "Legacy flattened table" not in repaired.text

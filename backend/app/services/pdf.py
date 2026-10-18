@@ -23,8 +23,10 @@ def _header(value: str | None) -> str:
 
 def table_blocks(rows: list[list[str | None]]) -> list[str]:
     """Repeat column labels in each record; keep merged column groups together."""
-    if len(rows) < 2:
+    if not rows:
         return []
+    if len(rows) == 1:
+        return [" | ".join(_clean(cell) for cell in rows[0] if _clean(cell))]
     first = rows[0]
     # A merged top row followed by complete subheaders, e.g. semester -> course/ECTS.
     grouped = (

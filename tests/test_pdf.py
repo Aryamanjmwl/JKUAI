@@ -75,3 +75,7 @@ def test_headerless_numeric_table_retains_its_first_data_row():
     text = " ".join(table_blocks([["Mandatory courses", "163.5"], ["Electives", "9"]]))
     assert "Column 1: Mandatory courses | Column 2: 163.5" in text
     assert "Column 1: Electives | Column 2: 9" in text
+
+
+def test_single_row_table_keeps_its_text():
+    assert table_blocks([["Thesis", "25 ECTS"]]) == ["Thesis | 25 ECTS"]
