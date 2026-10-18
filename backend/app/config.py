@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-3.1-flash-lite"
     openai_model: str = "gpt-4.1-mini"
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
-    reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    reranker_model: str = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
     # The initial database migration creates a vector(384) column.
     vector_dimension: int = Field(default=384, ge=384, le=384)
     retrieve_k: int = Field(default=20, ge=1, le=200)

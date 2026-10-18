@@ -57,3 +57,52 @@ def test_lexical_results_are_reauthorized_before_fusion_and_reranking():
     assert filters == [
         {"bool": {"should": [{"term": {"visibility": "public"}}], "minimum_should_match": 1}}
     ]
+
+
+def test_semester_aliases_preserve_question_and_add_shared_search_terms():
+    from app.services.query import semester_query
+
+    original = "Welche Lehrveranstaltungen sind im ersten Wintersemester Informatik empfohlen?"
+    expanded = semester_query(original)
+    assert expanded.startswith(original)
+    assert "winter semester" in expanded
+    assert "first semester 1. Semester" in expanded
+    assert "courses" in expanded
+    assert "recommended" in expanded
+    assert "Sommersemester" not in expanded
+    assert "summer semester" in semester_query("Which courses are in the second summer semester?")
+    assert "2. Semester" in semester_query("Which courses are in the second summer semester?")
+    assert semester_query("course prerequisites") == "course prerequisites"
+
+
+def test_unique_lexical_candidate_survives_until_reranking():
+    from app.config import Settings
+
+    document = SimpleNamespace(
+        id=uuid4(), title="Curriculum", file_name="guide.pdf", source_url=None
+    )
+    vector_chunk = SimpleNamespace(id=uuid4(), page_number=1, content="Cover")
+    lexical_chunk = SimpleNamespace(
+        id=uuid4(), page_number=10, content="First winter semester courses"
+    )
+    vector_rows, lexical_rows = Mock(), Mock()
+    vector_rows.all.return_value = [(vector_chunk, document, 0.2)]
+    lexical_rows.all.return_value = [(lexical_chunk, document)]
+    session = AsyncMock()
+    session.execute.side_effect = [vector_rows, lexical_rows]
+    with (
+        patch("app.services.search.get_settings", return_value=Settings(retrieve_k=1, rerank_k=1)),
+        patch("app.services.search.embed_texts_async", AsyncMock(return_value=[[0.1] * 384])),
+        patch(
+            "app.services.search.search_async",
+            AsyncMock(
+                return_value={"hits": {"hits": [{"_source": {"chunk_id": str(lexical_chunk.id)}}]}}
+            ),
+        ),
+        patch("app.services.search.rerank_async", AsyncMock(return_value=[])) as rerank,
+    ):
+        asyncio.run(hybrid_search(session, "winter semester courses", UserContext("guest", ())))
+    assert {hit["chunk_id"] for hit in rerank.call_args.args[1]} == {
+        str(vector_chunk.id),
+        str(lexical_chunk.id),
+    }

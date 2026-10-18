@@ -15,6 +15,7 @@ dependencies = [
   "pgvector>=0.4,<1",
   "pydantic-settings>=2.10,<3",
   "pypdf>=5.9,<7",
+  "pdfplumber>=0.11,<0.12",
   "python-multipart>=0.0.20,<1",
   "sqlalchemy[asyncio]>=2.0.40,<3",
   "uvicorn[standard]>=0.35,<1",

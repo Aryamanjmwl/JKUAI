@@ -1,26 +1,14 @@
 import hashlib
-import io
 
-from pypdf import PdfReader
-from pypdf.errors import PdfReadError
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth import UserContext, can_access
-from ..chunking import TextPage, chunk_pages
+from ..chunking import chunk_pages
 from ..models import Chunk, Document
 from .ml import embed_texts_async
-from .opensearch import index_chunks_async
-
-
-def parse_pdf(content: bytes) -> list[TextPage]:
-    try:
-        reader = PdfReader(io.BytesIO(content))
-        if reader.is_encrypted:
-            raise ValueError("Encrypted PDFs are not supported")
-        return [TextPage(i + 1, page.extract_text() or "") for i, page in enumerate(reader.pages)]
-    except (PdfReadError, OSError, KeyError, TypeError) as exc:
-        raise ValueError("The file could not be read as a PDF") from exc
+from .opensearch import index_chunks_async, remove_obsolete_chunks_async
+from .pdf import parse_pdf  # re-export for existing callers
 
 
 class DocumentConflictError(Exception):
@@ -63,16 +51,42 @@ async def ingest_pdf(
             or set(existing.allowed_groups) != set(allowed_groups)
         ):
             raise DocumentConflictError("This upload conflicts with an existing document")
-        count = await session.scalar(
-            select(func.count(Chunk.id)).where(Chunk.document_id == existing.id)
-        )
-        # Retry the lexical write too: a previous attempt may have committed in PostgreSQL
-        # while OpenSearch was subsequently restored or its index was rebuilt.
         rows = list(
-            (await session.scalars(select(Chunk).where(Chunk.document_id == existing.id))).all()
+            (
+                await session.scalars(
+                    select(Chunk)
+                    .where(Chunk.document_id == existing.id)
+                    .order_by(Chunk.chunk_index)
+                )
+            ).all()
         )
+        chunks = chunk_pages(parse_pdf(content))
+        if not chunks:
+            raise ValueError("No extractable text found in PDF")
+        previous = [(row.page_number, row.content) for row in rows]
+        current = [(chunk.page_number, chunk.content) for chunk in chunks]
+        if previous != current:
+            # Re-uploading the same bytes upgrades extraction without changing metadata or ACLs.
+            vectors = await embed_texts_async([chunk.content for chunk in chunks])
+            refreshed = []
+            for i, (chunk, vector) in enumerate(zip(chunks, vectors, strict=True)):
+                row = rows[i] if i < len(rows) else Chunk(document_id=existing.id)
+                row.chunk_index = chunk.chunk_index
+                row.page_number = chunk.page_number
+                row.content = chunk.content
+                row.embedding = vector
+                if i >= len(rows):
+                    session.add(row)
+                refreshed.append(row)
+            for row in rows[len(chunks) :]:
+                await session.delete(row)
+            rows = refreshed
+            await session.flush()
+            await session.commit()
+        # Retry writes after partial failures too. SQL remains authoritative during repair.
         await _index_document(existing, rows)
-        return existing, int(count or 0), True
+        await remove_obsolete_chunks_async(str(existing.id), [str(row.id) for row in rows])
+        return existing, len(rows), True
 
     chunks = chunk_pages(parse_pdf(content))
     if not chunks:

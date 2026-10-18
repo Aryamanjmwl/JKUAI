@@ -323,7 +323,7 @@ export default function App() {
                 <AnswerText answer={answerUnavailable ? "Answer generation failed. You can still inspect the retrieved passages below." : result.answer} sources={result.sources} />
               </p>
 
-              {mode === "answer" && !answerUnavailable && sourceCount > 0 && (
+              {mode === "answer" && !answerUnavailable && sourceCount > 0 && result.exact_documents_used.length > 0 && (
                 <div className="verification-note">
                   <span aria-hidden="true">✓</span>
                   <p><strong>Easy to verify</strong>Select a citation in the answer or open a source document to check the information.</p>

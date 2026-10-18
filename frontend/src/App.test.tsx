@@ -84,3 +84,19 @@ it("defaults to Gemini and clears its credential when switching providers", asyn
   expect(localStorage.length).toBe(0);
   expect(sessionStorage.length).toBe(0);
 });
+
+
+it("does not show the verification badge for an abstained answer", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+    ...result, answer: "I could not establish an answer from the accessible sources.",
+    exact_documents_used: [],
+  }) }));
+  const user = userEvent.setup();
+  render(<App />);
+  await user.type(screen.getByLabelText("Gemini API key"), "test-key");
+  await user.click(screen.getByRole("button", { name: "Use this key" }));
+  await user.type(screen.getByLabelText("Your question"), "winter semester courses");
+  await user.click(screen.getByRole("button", { name: "Ask JKUAI" }));
+  await screen.findByText("I could not establish an answer from the accessible sources.");
+  expect(screen.queryByText("Easy to verify")).toBeNull();
+});

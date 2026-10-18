@@ -60,7 +60,13 @@ login identities. Services bind to localhost; keep this configuration local.
 Click **Add PDF** in the top-right corner, choose a text PDF, review its title, and click
 **Upload PDF**. You can supply the original source URL so results link back to it.
 The success message shows how many passages were indexed; the document is immediately
-searchable. Uploading the same PDF again reuses its existing record.
+searchable. Uploading the same PDF again reuses its existing record and permissions.
+If PDF extraction has changed after an update, that upload refreshes its passages and
+embeddings. Ruled tables retain column labels, including winter/summer semester columns.
+Scans still require OCR before upload; unusual table layouts may need manual review.
+The multilingual reranker supports ranking German curriculum passages as well as English
+examples. Its first use after updating downloads a larger model into the existing cache.
+The embedding model and vector dimensions are unchanged.
 
 In the local role demo, **Selected groups** lets you restrict retrieval to comma-separated
 groups such as `students` or `staff`. Choose a matching simulated role to search a
@@ -147,7 +153,7 @@ loaded, blocking stale lexical grants. Scores are relevance rankings, not probab
 | API | Python 3.11–3.13, FastAPI, Pydantic, SQLAlchemy, Alembic |
 | Storage | PostgreSQL 16 and 384-dimensional pgvector embeddings |
 | Lexical search | OpenSearch 2.19 BM25 over titles and passage text |
-| Local ML | `all-MiniLM-L6-v2` bi-encoder and `ms-marco-MiniLM-L-6-v2` cross-encoder |
+| Local ML | `all-MiniLM-L6-v2` bi-encoder and `mmarco-mMiniLMv2-L12-H384-v1` cross-encoder |
 | Generation | Gemini Chat Completions or OpenAI Responses API; request-scoped keys and bounded output |
 | Client | React, TypeScript, Vite; Nginx serves the Docker build and proxies `/api` |
 | Infrastructure | Docker Compose, persistent database/index/model volumes |
