@@ -54,6 +54,7 @@ jobs:
       ENABLE_DEMO_ROLES: "true"
       RUN_INTEGRATION: "1"
       OFFICIAL_PDF: /tmp/jkuai-curriculum.pdf
+      OFFICIAL_BACHELOR_PDF: /tmp/jkuai-bs-curriculum.pdf
       TOKENIZERS_PARALLELISM: "false"
       OMP_NUM_THREADS: "2"
     steps:
@@ -87,6 +88,8 @@ jobs:
       - run: python scripts/demo.py --check
       - name: Download official curriculum for the document smoke test
         run: curl --fail --location --retry 2 --max-time 60 https://studienhandbuch.jku.at/texte/1170_7_MS_ComputerScience.pdf -o /tmp/jkuai-curriculum.pdf
+      - name: Download German bachelor curriculum for semester-table regression
+        run: curl --fail --location --retry 2 --max-time 60 https://studienhandbuch.jku.at/texte/1171_12_BS_Informatik.pdf -o /tmp/jkuai-bs-curriculum.pdf
       - run: pytest -q tests/integration
       - name: Capture service logs
         if: always()

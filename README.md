@@ -60,7 +60,10 @@ login identities. Services bind to localhost; keep this configuration local.
 Click **Add PDF** in the top-right corner, choose a text PDF, review its title, and click
 **Upload PDF**. You can supply the original source URL so results link back to it.
 The success message shows how many passages were indexed; the document is immediately
-searchable. Uploading the same PDF again reuses its existing record.
+searchable. Uploading the same PDF again reuses its existing record and permissions.
+If PDF extraction has changed after an update, that upload refreshes its passages and
+embeddings. Ruled tables retain column labels, including winter/summer semester columns.
+Scans still require OCR before upload; unusual table layouts may need manual review.
 
 In the local role demo, **Selected groups** lets you restrict retrieval to comma-separated
 groups such as `students` or `staff`. Choose a matching simulated role to search a

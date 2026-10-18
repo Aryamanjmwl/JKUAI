@@ -66,3 +66,23 @@ def index_available() -> bool:
 
 async def index_available_async() -> bool:
     return await asyncio.to_thread(index_available)
+
+
+async def remove_obsolete_chunks_async(document_id: str, current_ids: list[str]) -> None:
+    """Remove stale extraction rows only after their replacements are searchable."""
+    settings = get_settings()
+    with client() as search:
+        await asyncio.to_thread(
+            search.delete_by_query,
+            index=settings.opensearch_index,
+            body={
+                "query": {
+                    "bool": {
+                        "filter": [{"term": {"document_id": document_id}}],
+                        "must_not": [{"ids": {"values": current_ids}}],
+                    }
+                }
+            },
+            refresh=True,
+            conflicts="proceed",
+        )
