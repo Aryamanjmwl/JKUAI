@@ -154,9 +154,12 @@ def test_german_curriculum_semester_tables_are_retrievable_in_both_languages():
                 and s["page_number"] == 10
                 and "winter semester" in s["excerpt"]
             ]
-            assert matches, f"Missing winter study-plan evidence for: {query}"
+            assert matches, (query, response.json()["sources"])
             if "first" in query or "ersten" in query:
-                assert any("Softwareentwicklung 1" in s["excerpt"] for s in matches), query
+                assert any("Softwareentwicklung 1" in s["excerpt"] for s in matches), (
+                    query,
+                    response.json()["sources"],
+                )
             assert all(s["source_url"] == source_url for s in matches)
 
         # Simulate an older extractor with fewer, flattened rows. The duplicate upload
