@@ -65,6 +65,7 @@ def test_merged_semester_headers_stay_with_their_own_course_credit_pairs():
     assert len(blocks) == 2
     assert "Winter course; ECTS: 3" in blocks[0]
     assert "winter semester" in blocks[0]
+    assert "first semester / erstes Semester" in blocks[0]
     assert "Summer course" not in blocks[0]
     assert "Summer course; ECTS: 6" in blocks[1]
     assert "summer semester" in blocks[1]
