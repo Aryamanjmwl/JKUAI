@@ -1,9 +1,11 @@
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
 
 class SearchRequest(BaseModel):
+    provider: Literal["openai", "gemini"] = "openai"
     query: str = Field(min_length=3, max_length=1000)
 
     @field_validator("query", mode="before")

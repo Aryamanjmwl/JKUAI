@@ -62,3 +62,11 @@ it.each([
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 429, json: async () => ({ detail: { code } }) }));
   await expect(searchKnowledge("question", [], "key")).rejects.toThrow(message);
 });
+
+it("routes Gemini credentials separately and labels its quota errors", async () => {
+  const fetch = vi.fn().mockResolvedValue({ ok: false, status: 429, json: async () => ({ detail: { code: "gemini_rate_limited" } }) });
+  vi.stubGlobal("fetch", fetch);
+  await expect(searchKnowledge("question", [], "google-test", "answer", "gemini")).rejects.toThrow("free-tier quota");
+  expect(fetch.mock.calls[0][1].headers).toMatchObject({ "X-Gemini-API-Key": "google-test" });
+  expect(fetch.mock.calls[0][1].headers).not.toHaveProperty("X-OpenAI-API-Key");
+});

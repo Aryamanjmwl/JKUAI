@@ -7,10 +7,10 @@ from app.database import get_session
 from app.main import app
 from app.security import get_user_context
 from app.services.generation import (
-    InvalidOpenAICredentialsError,
-    OpenAIQuotaError,
-    OpenAIRateLimitError,
-    OpenAIServiceError,
+    InvalidProviderCredentialsError,
+    ProviderQuotaError,
+    ProviderRateLimitError,
+    ProviderServiceError,
 )
 from fastapi.testclient import TestClient
 
@@ -72,10 +72,10 @@ def test_answer_lists_only_documents_actually_cited(client, hits):
 @pytest.mark.parametrize(
     "error,status",
     [
-        (InvalidOpenAICredentialsError, 401),
-        (OpenAIQuotaError, 429),
-        (OpenAIRateLimitError, 429),
-        (OpenAIServiceError, 502),
+        (InvalidProviderCredentialsError, 401),
+        (ProviderQuotaError, 429),
+        (ProviderRateLimitError, 429),
+        (ProviderServiceError, 502),
     ],
 )
 def test_provider_errors_have_stable_http_responses(client, hits, error, status):
@@ -86,9 +86,9 @@ def test_provider_errors_have_stable_http_responses(client, hits, error, status)
         response = client.post("/search", json={"query": "course requirements"})
     assert response.status_code == status
     assert "detail" in response.json()
-    if error is OpenAIQuotaError:
+    if error is ProviderQuotaError:
         assert response.json()["detail"] == {"code": "openai_quota_exhausted"}
-    if error is OpenAIRateLimitError:
+    if error is ProviderRateLimitError:
         assert response.json()["detail"] == {"code": "openai_rate_limited"}
 
 
@@ -181,3 +181,85 @@ def test_source_excerpts_include_the_entire_passage_supplied_to_generation(clien
         response = client.post("/search/retrieval", json={"query": "supporting statement"})
     assert response.status_code == 200
     assert response.json()["sources"][0]["excerpt"] == hits[0]["content"]
+
+
+@pytest.mark.parametrize(
+    "provider,expected_key", [("openai", "openai-secret"), ("gemini", "google-secret")]
+)
+def test_provider_selects_only_its_own_key(client, hits, provider, expected_key):
+    with (
+        patch("app.main.hybrid_search", AsyncMock(return_value=hits)),
+        patch("app.main.generate_answer", AsyncMock(return_value="Required. [S1]")) as generate,
+    ):
+        response = client.post(
+            "/search",
+            json={"query": "requirements", "provider": provider},
+            headers={
+                "X-OpenAI-API-Key": "openai-secret",
+                "X-Gemini-API-Key": "google-secret",
+            },
+        )
+    assert response.status_code == 200
+    generate.assert_awaited_once_with("requirements", hits, expected_key, provider)
+
+
+def test_invalid_provider_is_rejected_before_retrieval(client):
+    with patch("app.main.hybrid_search", AsyncMock()) as search:
+        response = client.post(
+            "/search", json={"query": "requirements", "provider": "https://evil.example"}
+        )
+    assert response.status_code == 422
+    search.assert_not_called()
+
+
+def test_missing_gemini_key_does_not_reuse_openai_key(client, hits):
+    with patch("app.main.hybrid_search", AsyncMock(return_value=hits)):
+        response = client.post(
+            "/search",
+            json={"query": "requirements", "provider": "gemini"},
+            headers={"X-OpenAI-API-Key": "secret"},
+        )
+    assert response.status_code == 401
+    assert "secret" not in response.text
+
+
+def test_gemini_header_is_allowed_for_native_frontend(client):
+    response = client.options(
+        "/search",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type,x-gemini-api-key",
+        },
+    )
+    assert response.status_code == 200
+    assert "x-gemini-api-key" in response.headers["access-control-allow-headers"].lower()
+
+
+@pytest.mark.parametrize(
+    "error,status,code",
+    [
+        ("ProviderRateLimitError", 429, "gemini_rate_limited"),
+        ("ProviderQuotaError", 429, "gemini_quota_exhausted"),
+        ("ProviderAccessError", 403, "provider_access_denied"),
+        ("ProviderConfigurationError", 502, "provider_configuration_error"),
+        ("ProviderServiceError", 502, "provider_unavailable"),
+    ],
+)
+def test_gemini_errors_reach_client_as_safe_codes(client, hits, error, status, code):
+    from app.services import generation
+
+    with (
+        patch("app.main.hybrid_search", AsyncMock(return_value=hits)),
+        patch(
+            "app.main.generate_answer", AsyncMock(side_effect=getattr(generation, error)("secret"))
+        ),
+    ):
+        response = client.post(
+            "/search",
+            json={"query": "requirements", "provider": "gemini"},
+            headers={"X-Gemini-API-Key": "secret"},
+        )
+    assert response.status_code == status
+    assert response.json() == {"detail": {"code": code}}
+    assert "secret" not in response.text

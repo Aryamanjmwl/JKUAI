@@ -18,10 +18,12 @@ from .models import Document
 from .schemas import IngestResponse, RetrievalResponse, SearchRequest, SearchResponse, Source
 from .security import get_user_context
 from .services.generation import (
-    InvalidOpenAICredentialsError,
-    OpenAIQuotaError,
-    OpenAIRateLimitError,
-    OpenAIServiceError,
+    InvalidProviderCredentialsError,
+    ProviderAccessError,
+    ProviderConfigurationError,
+    ProviderQuotaError,
+    ProviderRateLimitError,
+    ProviderServiceError,
     cited_source_ids,
     generate_answer,
 )
@@ -37,7 +39,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="JKU Knowledge Search", version="0.1.0", lifespan=lifespan)
-allowed_headers = ["Content-Type", "X-OpenAI-API-Key"]
+allowed_headers = ["Content-Type", "X-OpenAI-API-Key", "X-Gemini-API-Key"]
 if get_settings().enable_demo_roles:
     allowed_headers.extend(["X-User-Id", "X-User-Groups"])
 app.add_middleware(
@@ -127,19 +129,25 @@ async def search(
     session: Annotated[AsyncSession, Depends(get_session)],
     user: Annotated[UserContext, Depends(get_user_context)],
     openai_api_key: Annotated[str | None, Header(alias="X-OpenAI-API-Key")] = None,
+    gemini_api_key: Annotated[str | None, Header(alias="X-Gemini-API-Key")] = None,
 ) -> SearchResponse:
     start = perf_counter()
     hits = await hybrid_search(session, request.query, user)
     try:
-        answer = await generate_answer(request.query, hits, openai_api_key)
-    except InvalidOpenAICredentialsError as exc:
-        raise HTTPException(401, "The OpenAI API key was not accepted") from exc
-    except OpenAIQuotaError as exc:
-        raise HTTPException(429, {"code": "openai_quota_exhausted"}) from exc
-    except OpenAIRateLimitError as exc:
-        raise HTTPException(429, {"code": "openai_rate_limited"}) from exc
-    except OpenAIServiceError as exc:
-        raise HTTPException(502, "OpenAI is temporarily unavailable") from exc
+        api_key = gemini_api_key if request.provider == "gemini" else openai_api_key
+        answer = await generate_answer(request.query, hits, api_key, request.provider)
+    except InvalidProviderCredentialsError as exc:
+        raise HTTPException(401, {"code": "invalid_provider_key"}) from exc
+    except ProviderQuotaError as exc:
+        raise HTTPException(429, {"code": f"{request.provider}_quota_exhausted"}) from exc
+    except ProviderRateLimitError as exc:
+        raise HTTPException(429, {"code": f"{request.provider}_rate_limited"}) from exc
+    except ProviderAccessError as exc:
+        raise HTTPException(403, {"code": "provider_access_denied"}) from exc
+    except ProviderConfigurationError as exc:
+        raise HTTPException(502, {"code": "provider_configuration_error"}) from exc
+    except ProviderServiceError as exc:
+        raise HTTPException(502, {"code": "provider_unavailable"}) from exc
     sources = _build_sources(hits)
     return SearchResponse(
         answer=answer,

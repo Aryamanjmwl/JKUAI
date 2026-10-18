@@ -24,17 +24,19 @@ must remain disabled anywhere that is reachable by untrusted users.
 | Search | Anonymous callers are restricted to public documents | No user authentication, abuse controls, or request quotas |
 | Restricted documents | ACL filtering occurs in both retrieval engines | Group membership is simulated in developer mode; no identity provider or ACL synchronization |
 | Document ingestion | File type, size, title, source URL, and visibility are validated | `POST /documents` is unauthenticated and intended only for local use |
-| OpenAI credential | Accepted per request and not intentionally persisted by the application | A browser-supplied key passes through the API process and any surrounding infrastructure |
+| Provider credential | Accepted per request and not intentionally persisted by the application | A browser-supplied key passes through the API process and any surrounding infrastructure |
 | Generated answers | The model is instructed to use retrieved sources; missing and unknown citation IDs are rejected | Prompt injection and citation correctness are not yet automatically evaluated |
 | Local infrastructure | Docker services are convenient and reproducible | Default database credentials and disabled OpenSearch security are unsuitable for deployment |
 | Data at rest | Documents and chunks remain in local Docker volumes | Encryption, backup policy, retention, and secure deletion are not configured |
 
-## OpenAI key handling
+## Provider key handling
 
 The web client keeps the key in React component state for the current page. It does not
 write the key to local storage, session storage, cookies, PostgreSQL, or OpenSearch. The
 backend constructs a request-scoped OpenAI client and does not deliberately log or save
-the header.
+the header. Gemini requests use a fixed Google endpoint and a separate header; switching
+providers clears the browser key. No automatic fallback sends a credential to another provider.
+Free-tier provider data policies should be reviewed before submitting private material.
 
 This reduces accidental persistence; it does not make entering a key into an arbitrary
 website safe. Browser extensions, a compromised frontend, reverse-proxy logs, tracing
@@ -61,7 +63,7 @@ Before deployment to untrusted users:
 1. Add an identity provider and validate signed sessions or tokens at the API boundary.
 2. Derive groups server-side and test ACL synchronization, revocation, and index parity.
 3. Restrict document ingestion to an authenticated administrative role.
-4. Store OpenAI credentials in a managed secret store and remove browser key entry.
+4. Store Provider credentials in a managed secret store and remove browser key entry.
 5. Put the API behind HTTPS, a restrictive proxy, rate limits, request-size limits, and
    explicit security headers.
 6. Replace development database credentials; enable transport authentication and

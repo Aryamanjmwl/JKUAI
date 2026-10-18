@@ -50,13 +50,17 @@ cardinality before tuning HNSW search parameters.
 
 ## Generation and attribution
 
-`POST /search` uses the same retrieval path. The request-scoped OpenAI client receives
-the question and the permitted passages with stable `[S1]`…`[Sn]` IDs. It uses the
-configured Responses API model (default `gpt-4.1-mini`) with a 30-second request
-timeout, one retry, and a 700-token output limit. Requests use `store=False`; this
-does not replace a review of the provider’s data-retention policies.
-`X-OpenAI-API-Key` is supplied by the trusted local client and is not persisted by the
-application. The question and retrieved text are sent to the provider.
+`POST /search` uses the same retrieval path. Its validated `provider` field is `openai`
+(the API default for existing clients) or `gemini` (the UI default). The API reads only
+the corresponding `X-OpenAI-API-Key` or `X-Gemini-API-Key` header. The key is request-scoped
+and is not persisted. User-supplied provider URLs are not accepted.
+
+The shared OpenAI SDK calls either OpenAI Responses (`gpt-4.1-mini`, 700 output tokens,
+`store=False`) or Google's documented compatibility endpoint for Chat Completions
+(`gemini-3.1-flash-lite`, 2,048 output tokens, minimal reasoning). Both have a 30-second
+request timeout and at most one retry. Gemini's output must finish normally before its
+citations are validated. Provider data policies apply to questions and passages sent
+for generation; the application does not enforce a provider's free billing tier.
 
 The prompt asks for source-supported claims and abstention when evidence is insufficient.
 A syntax guard rejects empty outputs, missing citation IDs, and invented IDs by returning
