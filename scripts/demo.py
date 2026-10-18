@@ -68,7 +68,7 @@ def build_pdf(text: str) -> bytes:
         commands.append(f"({escaped}) Tj T*")
     commands.append("ET")
     stream = DecodedStreamObject()
-    stream.set_data("\n".join(commands).encode("ascii"))
+    stream.set_data("\n".join(commands).encode("cp1252"))
     page[NameObject("/Contents")] = writer._add_object(stream)
     output = io.BytesIO()
     writer.write(output)
