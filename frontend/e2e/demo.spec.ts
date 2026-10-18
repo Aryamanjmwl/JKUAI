@@ -94,7 +94,7 @@ test("answer flow recovers from exhausted credit after changing the API key", as
   });
   await page.goto("/");
   await expect(page.getByRole("button", { name: "Search sources" })).toHaveCount(0);
-  await page.getByLabel("Answer provider").selectOption("openai");
+  await page.getByRole("combobox", { name: "Answer provider", exact: true }).selectOption("openai");
   await page.getByLabel("OpenAI API key", { exact: true }).fill("sk-browser-old");
   await page.getByRole("button", { name: "Use this key" }).click();
   await page.getByLabel("Your question").fill("What is the contact email?");
@@ -129,7 +129,7 @@ test("Gemini answers use their own key and provider switching clears it", async 
     } });
   });
   await page.goto("/");
-  await expect(page.getByLabel("Answer provider")).toHaveValue("gemini");
+  await expect(page.getByRole("combobox", { name: "Answer provider", exact: true })).toHaveValue("gemini");
   await page.getByLabel("Gemini API key", { exact: true }).fill("google-browser-test");
   await page.getByRole("button", { name: "Use this key" }).click();
   await page.getByLabel("Your question").fill("What do I need before Advanced ML?");
@@ -138,7 +138,7 @@ test("Gemini answers use their own key and provider switching clears it", async 
   await page.locator(".answer-text .citation").click();
   await expect(page).toHaveURL(/#S1$/);
   await page.getByRole("button", { name: "Change API key" }).click();
-  await page.getByLabel("Answer provider").selectOption("openai");
+  await page.getByRole("combobox", { name: "Answer provider", exact: true }).selectOption("openai");
   await expect(page.getByLabel("OpenAI API key", { exact: true })).toHaveValue("");
   await expect(page.locator(".results")).toHaveCount(0);
   await expect(page.getByLabel("Your question")).toHaveValue("What do I need before Advanced ML?");
